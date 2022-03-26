@@ -79,14 +79,14 @@ parser.add_argument('box_center', type=coordreader,
 parser.add_argument('box_size', type=coordreader,
                     help='Comma delimited string listing lx,ly,lz as the lengths of the x, y and z box-sides.')
 parser.add_argument('-r', '--replicas', type=int, default=1,
-                    help='Number of replica docking runs to perform')
+                    help='Number of replica docking runs to perform. Default: 1')
 parser.add_argument('-e', '--exhaustiveness', type=int, default=32,
-                    help='AutoDock-Vina exhaustiveness parameter. Threads used proportional to this value.')
+                    help='AutoDock-Vina exhaustiveness parameter. Threads used proportional to this value. Default: 32')
 parser.add_argument('--protein-prefix', type=str, default='frame00',
-                    help='String to prefix output pdbqts with.')
+                    help='String to prefix output pdbqts with. Default: frame00')
 parser.add_argument('-d','--docking_algorithm', default='vina',
                     choices=docking_methods.keys(),
-                    help='Pick which docking algorithm to use')
+                    help='Pick which docking algorithm to use. Default: vina')
 
 
 args = parser.parse_args()
