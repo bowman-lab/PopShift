@@ -94,8 +94,8 @@ path_lig = args.ligand_dir
 path_prot = args.protein_dir
 path_output = args.output
 protein_name = path_output.split('/')[-1]
-n_procs = mp.cpu_count()
-pool = mp.Pool(processes=4)
+n_procs = mp.cpu_count() #TODO Need to check whether this takes cpu count of the node, or the number of cpus requested
+pool = mp.Pool(processes=int(n_procs/args.exhaustiveness)) #if the above function gets the # of CPUs requested, this should work 
 
 try:
     os.makedirs('%s' % path_output)
