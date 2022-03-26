@@ -94,7 +94,6 @@ path_lig = args.ligand_dir
 path_prot = args.protein_dir
 path_output = args.output
 protein_name = path_output.split('/')[-1]
-docking_alg = args.docking_algorithm
 n_procs = mp.cpu_count()
 pool = mp.Pool(processes=4)
 
@@ -115,12 +114,7 @@ for ligand in sorted(glob.glob('%s/*pdbqt' % path_lig)):
         ligand_names = [i for i in [ligand_name] for l in range(len(frames))]
         output_path = '%s/%s/replica%s' % (path_output,ligand_name,replica)
         output_paths = [i for i in [output_path] for l in range(len(frames))]
-        if docking_alg == 'vina':
-            loaded_dock = partial(dock_vina, args.box_center, args.box_size, args.exhaustiveness)
-        else:
-            loaded_dock = partial(dock_smina, args.box_center, args.box_size, args.exhaustiveness)
-        #loaded_dock = partial(args.docking_algorithm, args.box_center, args.box_size, args.exhaustiveness)
-        #print(output_paths)
+        loaded_dock = partial(docking_methods[args.docking_algorithm], args.box_center, args.box_size, args.exhaustiveness)
         arguments = zip(frames, ligand_files, ligand_names, output_paths)
         list(pool.starmap(loaded_dock, arguments))
 
