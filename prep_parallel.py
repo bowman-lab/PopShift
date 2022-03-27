@@ -7,6 +7,8 @@
 
 #python prep_parallel.py -p /full/path/to/protein/files -l /full/path/to/ligands/files -o /full/path/to/output -a "no" if not aligning, /full/path/to/reference/structure/otherwise
 
+#TODO might be interesting to add the function of adding amber charges instead of only vina charges to the protein
+
 import numpy as np
 import os
 import subprocess as sp
@@ -28,13 +30,13 @@ def prep_receptor(receptor, out, name):
 
 def align(protein_file,reference_file,output):
     pdb = md.load(protein_file)
-    #atoms = pdb.topology.select(' or '.join(f'(backbone and resSeq {r})' for r in pocket_residues['myh2-5n6a']))
-    atoms = pdb.topology.select('backbone')
+    atoms = pdb.topology.select('backbone') #TODO change this to be an input with backbone being default (mdtraj syntax to be input) - input could be different; such as aligning different pockets between runs
     aligned = pdb.superpose(reference_file, atom_indices=atoms)
     prot_name = protein_file.split('/')[-1].split('.')[0]
     aligned.save_pdb('%s/%s_aligned.pdb' % (output,prot_name))
     return '%s/%s_aligned.pdb' % (output, prot_name)
 
+#TODO change the parser to argparse
 parser = OptionParser()
 parser.add_option('-l','--ligand_dir', dest='ligand_dir', help='Path to ligand directory')
 parser.add_option('-p','--protein_dir', dest='protein_dir', help='Path to protein directory')
@@ -58,6 +60,7 @@ try:
 except FileExistsError:
     pass
 
+#TODO prep_ligand and prep_protein should be combines; prep_ligand can only be done if a certain flag exists --ligand yes
 #for ligand in sorted(glob.glob('%s/*mol2' % path_lig)):  #Having pdb here should only be a temporary solution, make sure to change this and also take mol2
 #    os.chdir(path_lig)
 #    preplig(ligand)
