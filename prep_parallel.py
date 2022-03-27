@@ -8,6 +8,7 @@
 #python prep_parallel.py -p /full/path/to/protein/files -l /full/path/to/ligands/files -o /full/path/to/output -a "no" if not aligning, /full/path/to/reference/structure/otherwise
 
 #TODO might be interesting to add the function of adding amber charges instead of only vina charges to the protein
+#! BUG: seems to convert all the ligands to a random ligand with different charges in each mol2 file - antechamber
 
 import os
 import subprocess as sp
@@ -19,29 +20,44 @@ import multiprocessing as mp
 
 executables = '/project/bowmanlab/bnovak/ADFRsuite_x86_64Linux_1.0/bin' # Path to ADFR suite where prep scripts are
 
-# preplig_vina takes in a ligand and adds vina charges to it
+# Adds vina charges to a ligand
 def preplig_vina(ligand):
     os.chdir(path_lig)
     sp.run(['%s/prepare_ligand' % executables, '-l', ligand,])
     return print("Ligand has been converted to pdbqt file with vina charges")
 
-def preplig_vina(ligand):
+# Adds antechamber charges to the ligand pdb
+def add_charges(ligand):
+    #os.chdir(path_lig)
+    #name = (ligand.split('/')[-1]).split('.')[0]
+    name = ligand.split('.')[0]
+    sp.run('antechamber -i %s -fi pdb -o %s.mol2 -fo mol2 -c bcc -at gaff2' % (ligand, name),shell=True)
+    return '%s.mol2' % name
+
+# Converts to pdbqt using user provided charges
+def preplig(ligand):
     os.chdir(path_lig)
     sp.run(['%s/prepare_ligand' % executables, '-l', ligand, '-C'])
     return print("Ligand has been converted to pdbqt file using provided charges")
 
+# Converts protein pdb to pdbqt file
 def prep_receptor(receptor, out, name):
     sp.run(['%s/prepare_receptor' % executables, '-r', receptor, '-o', '%s/%sqt' % (out, name)])
     return '%s/%sqt' % (out, name)
 
+# Aligns protein files using user provided atoms
 def align(protein_file,reference_file,output, atoms):
     pdb = md.load(protein_file)
     atoms = pdb.topology.select(atoms)
-    print('Aligning using %s' % atoms)
     aligned = pdb.superpose(reference_file, atom_indices=atoms)
     prot_name = protein_file.split('/')[-1].split('.')[0]
     aligned.save_pdb('%s/%s_aligned.pdb' % (output,prot_name))
     return '%s/%s_aligned.pdb' % (output, prot_name)
+
+charge_methods={
+    'vina': preplig_vina,
+    'antechamber': add_charges
+}
 
 parser = argparse.ArgumentParser()
 parser.add_argument('protein_dir',
@@ -57,6 +73,9 @@ parser.add_argument('-r','--reference', default='None',
                     help='Path to reference structure to use for aligning')
 parser.add_argument('-x','--atoms', default='backbone',
                     help='What atoms to use for aligning. Default: backbone')
+parser.add_argument('-c','--charge', default='vina',
+                    choices=['antechamber', 'vina'],
+                    help='What charges to add the ligand, Default: vina')
 
 args = parser.parse_args()
 path_lig = args.ligand_dir
@@ -79,7 +98,9 @@ except FileExistsError:
 if args.ligand_dir is not None:
     print('Adding charges to the ligand')
     ligands = sorted(glob.glob('%s/*pdb' % path_lig))  #! Only takes in pdbs for now
-    list(pool.map(preplig_vina, ligands))
+    charged_ligands = list(pool.map(charge_methods[args.charge], ligands))
+    if args.charge == 'antechamber':
+        list(pool.map(preplig,charged_ligands))
 else:
     print('Assuming ligand charges are already added')
 
