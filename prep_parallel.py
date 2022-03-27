@@ -13,16 +13,22 @@ import os
 import subprocess as sp
 import sys
 import mdtraj as md
-#from optparse import OptionParser
 import argparse
 import glob
 import multiprocessing as mp
 
 executables = '/project/bowmanlab/bnovak/ADFRsuite_x86_64Linux_1.0/bin' # Path to ADFR suite where prep scripts are
 
-def preplig(ligand):
-    sp.run(['%s/prepare_ligand' % executables, '-l', ligand, '-C']) # This uses the charges prepared using antechamber
+# preplig_vina takes in a ligand and adds vina charges to it
+def preplig_vina(ligand):
+    os.chdir(path_lig)
+    sp.run(['%s/prepare_ligand' % executables, '-l', ligand,])
     return print("Ligand has been converted to pdbqt file with vina charges")
+
+def preplig_vina(ligand):
+    os.chdir(path_lig)
+    sp.run(['%s/prepare_ligand' % executables, '-l', ligand, '-C'])
+    return print("Ligand has been converted to pdbqt file using provided charges")
 
 def prep_receptor(receptor, out, name):
     sp.run(['%s/prepare_receptor' % executables, '-r', receptor, '-o', '%s/%sqt' % (out, name)])
@@ -68,16 +74,14 @@ try:
 except FileExistsError:
     pass
 
+# Checking whether ligands need to be prepared as well, by checking if --ligands_dir flag is set
+#TODO change so that either mol2 or a pdb can be input
 if args.ligand_dir is not None:
-    print('ligand_dir is set') #! This is where setting up ligands should go
+    print('Adding charges to the ligand')
+    ligands = sorted(glob.glob('%s/*pdb' % path_lig))  #! Only takes in pdbs for now
+    list(pool.map(preplig_vina, ligands))
 else:
-    print('not set')
-
-#TODO prep_ligand and prep_protein should be combines; prep_ligand can only be done if a certain flag exists --ligand yes
-#for ligand in sorted(glob.glob('%s/*mol2' % path_lig)):  #Having pdb here should only be a temporary solution, make sure to change this and also take mol2
-#    os.chdir(path_lig)
-#    preplig(ligand)
-#    os.chdir('..')
+    print('Assuming ligand charges are already added')
 
 if to_align == 'yes':
     reference_protein = md.load(reference)
@@ -90,12 +94,12 @@ if to_align == 'yes':
     aligned = list(pool.starmap(align, arguments))
     arguments = zip(aligned, output_list, prot_name)
     list(pool.starmap(prep_receptor, arguments))
-    pool.close()
 else:
     frames = sorted(glob.glob('%s/*pdb' % path_prot))
     prot_name = [frame.split('/')[-1] for frame in frames]
     output_list = [i for i in [path_output] for l in range(len(frames))]
     arguments = zip(frames, output_list,prot_name)
     list(pool.starmap(prep_receptor, arguments))
-    pool.close()
+
+pool.close()
 
