@@ -28,8 +28,6 @@ def preplig_vina(ligand):
 
 # Adds antechamber charges to the ligand pdb
 def add_charges(ligand):
-    #os.chdir(path_lig)
-    #name = (ligand.split('/')[-1]).split('.')[0]
     name = ligand.split('.')[0]
     sp.run('antechamber -i %s -fi pdb -o %s.mol2 -fo mol2 -c bcc -at gaff2' % (ligand, name),shell=True)
     return '%s.mol2' % name
@@ -66,11 +64,8 @@ parser.add_argument('output',
                     help='Path to the output')
 parser.add_argument('-l','--ligand_dir',
                     help='Path to ligand directory')
-parser.add_argument('-a','--align', default='no',
-                    choices=['yes','no'],
-                    help='Whether to align the structures. Default: no')
 parser.add_argument('-r','--reference', default='None',
-                    help='Path to reference structure to use for aligning')
+                    help='Path to reference structure to use if aligning')
 parser.add_argument('-x','--atoms', default='backbone',
                     help='What atoms to use for aligning. Default: backbone')
 parser.add_argument('-c','--charge', default='vina',
@@ -81,7 +76,7 @@ args = parser.parse_args()
 path_lig = args.ligand_dir
 path_prot = args.protein_dir
 path_output = args.output
-to_align = args.align
+#to_align = args.align
 reference = args.reference
 
 protein_name = path_output.split('/')[-1]
@@ -94,10 +89,9 @@ except FileExistsError:
     pass
 
 # Checking whether ligands need to be prepared as well, by checking if --ligands_dir flag is set
-#TODO change so that either mol2 or a pdb can be input
 if args.ligand_dir is not None:
     print('Adding charges to the ligand')
-    ligands = sorted(glob.glob('%s/*pdb' % path_lig))  #! Only takes in pdbs for now; change it to be mol2 as well
+    ligands = sorted(glob.glob('%s/*pdb' % path_lig)) #TODO change so that either mol2 or a pdb can be input
     for ligand in ligands:
         charge_methods[args.charge](ligand)
     #charged_ligands = list(pool.map(charge_methods[args.charge], ligands)) #! Currently not using map, because it makes all the ligands have the same atoms with different charges for yet unknown reason
@@ -105,25 +99,27 @@ if args.ligand_dir is not None:
         charged_ligands = sorted(glob.glob('%s/*mol2' % path_lig))
         list(pool.map(preplig,charged_ligands))
 else:
-    print('Assuming ligand charges are already added')
+    print('Assuming ligands have been already converted to pdbqts with partial charges')
 
-# if to_align == 'yes':
-#     reference_protein = md.load(reference)
-#     frames = sorted(glob.glob('%s/*pdb' % path_prot))
-#     prot_name = [frame.split('/')[-1] for frame in frames]
-#     output_list = [path_output for l in range(len(frames))]
-#     reference_protein = [i for i in reference_protein for l in range(len(frames))]
-#     atoms = [args.atoms for l in range(len(frames))]
-#     arguments = zip(frames, reference_protein, output_list,atoms)
-#     aligned = list(pool.starmap(align, arguments))
-#     arguments = zip(aligned, output_list, prot_name)
-#     list(pool.starmap(prep_receptor, arguments))
-# else:
-#     frames = sorted(glob.glob('%s/*pdb' % path_prot))
-#     prot_name = [frame.split('/')[-1] for frame in frames]
-#     output_list = [i for i in [path_output] for l in range(len(frames))]
-#     arguments = zip(frames, output_list,prot_name)
-#     list(pool.starmap(prep_receptor, arguments))
+# Aligning and converting protein pdbs to pdbqts
+if reference != 'None':
+    print('Aligning protein to reference')
+    reference_protein = md.load(reference)
+    frames = sorted(glob.glob('%s/*pdb' % path_prot)) 
+    prot_name = [frame.split('/')[-1] for frame in frames]
+    output_list = [path_output for l in range(len(frames))]
+    reference_protein = [reference_protein for l in range(len(frames))]
+    atoms = [args.atoms for l in range(len(frames))]
+    arguments = zip(frames, reference_protein, output_list,atoms)
+    aligned = list(pool.starmap(align, arguments))
+    arguments = zip(aligned, output_list, prot_name)
+    list(pool.starmap(prep_receptor, arguments))
+else:
+    frames = sorted(glob.glob('%s/*pdb' % path_prot))
+    prot_name = [frame.split('/')[-1] for frame in frames]
+    output_list = [path_output for l in range(len(frames))]
+    arguments = zip(frames, output_list,prot_name)
+    list(pool.starmap(prep_receptor, arguments))
 
 pool.close()
 
