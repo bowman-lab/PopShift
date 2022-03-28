@@ -66,7 +66,7 @@ parser.add_argument('-l','--ligand_dir',
                     help='Path to ligand directory')
 parser.add_argument('-r','--reference', default='None',
                     help='Path to reference structure to use if aligning')
-parser.add_argument('-x','--atoms', default='backbone',
+parser.add_argument('-a','--atoms', default='backbone',
                     help='What atoms to use for aligning. Default: backbone')
 parser.add_argument('-c','--charge', default='vina',
                     choices=['antechamber', 'vina'],
@@ -76,7 +76,6 @@ args = parser.parse_args()
 path_lig = args.ligand_dir
 path_prot = args.protein_dir
 path_output = args.output
-#to_align = args.align
 reference = args.reference
 
 protein_name = path_output.split('/')[-1]
