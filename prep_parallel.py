@@ -8,7 +8,7 @@
 #python prep_parallel.py -p /full/path/to/protein/files -l /full/path/to/ligands/files -o /full/path/to/output -a "no" if not aligning, /full/path/to/reference/structure/otherwise
 
 #TODO might be interesting to add the function of adding amber charges instead of only vina charges to the protein
-#! BUG: seems to convert all the ligands to a random ligand with different charges in each mol2 file - antechamber
+#* Fixed BUG by not using map: seems to convert all the ligands to a random ligand with different charges in each mol2 file - antechamber
 
 import os
 import subprocess as sp
@@ -97,30 +97,33 @@ except FileExistsError:
 #TODO change so that either mol2 or a pdb can be input
 if args.ligand_dir is not None:
     print('Adding charges to the ligand')
-    ligands = sorted(glob.glob('%s/*pdb' % path_lig))  #! Only takes in pdbs for now
-    charged_ligands = list(pool.map(charge_methods[args.charge], ligands))
+    ligands = sorted(glob.glob('%s/*pdb' % path_lig))  #! Only takes in pdbs for now; change it to be mol2 as well
+    for ligand in ligands:
+        charge_methods[args.charge](ligand)
+    #charged_ligands = list(pool.map(charge_methods[args.charge], ligands)) #! Currently not using map, because it makes all the ligands have the same atoms with different charges for yet unknown reason
     if args.charge == 'antechamber':
+        charged_ligands = sorted(glob.glob('%s/*mol2' % path_lig))
         list(pool.map(preplig,charged_ligands))
 else:
     print('Assuming ligand charges are already added')
 
-if to_align == 'yes':
-    reference_protein = md.load(reference)
-    frames = sorted(glob.glob('%s/*pdb' % path_prot))
-    prot_name = [frame.split('/')[-1] for frame in frames]
-    output_list = [path_output for l in range(len(frames))]
-    reference_protein = [i for i in reference_protein for l in range(len(frames))]
-    atoms = [args.atoms for l in range(len(frames))]
-    arguments = zip(frames, reference_protein, output_list,atoms)
-    aligned = list(pool.starmap(align, arguments))
-    arguments = zip(aligned, output_list, prot_name)
-    list(pool.starmap(prep_receptor, arguments))
-else:
-    frames = sorted(glob.glob('%s/*pdb' % path_prot))
-    prot_name = [frame.split('/')[-1] for frame in frames]
-    output_list = [i for i in [path_output] for l in range(len(frames))]
-    arguments = zip(frames, output_list,prot_name)
-    list(pool.starmap(prep_receptor, arguments))
+# if to_align == 'yes':
+#     reference_protein = md.load(reference)
+#     frames = sorted(glob.glob('%s/*pdb' % path_prot))
+#     prot_name = [frame.split('/')[-1] for frame in frames]
+#     output_list = [path_output for l in range(len(frames))]
+#     reference_protein = [i for i in reference_protein for l in range(len(frames))]
+#     atoms = [args.atoms for l in range(len(frames))]
+#     arguments = zip(frames, reference_protein, output_list,atoms)
+#     aligned = list(pool.starmap(align, arguments))
+#     arguments = zip(aligned, output_list, prot_name)
+#     list(pool.starmap(prep_receptor, arguments))
+# else:
+#     frames = sorted(glob.glob('%s/*pdb' % path_prot))
+#     prot_name = [frame.split('/')[-1] for frame in frames]
+#     output_list = [i for i in [path_output] for l in range(len(frames))]
+#     arguments = zip(frames, output_list,prot_name)
+#     list(pool.starmap(prep_receptor, arguments))
 
 pool.close()
 
