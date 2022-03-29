@@ -18,12 +18,14 @@ import argparse
 import glob
 import multiprocessing as mp
 
-executables = '/project/bowmanlab/bnovak/ADFRsuite_x86_64Linux_1.0/bin' # Path to ADFR suite where prep scripts are
+home = os.getcwd()
+
+#executables = '/project/bowmanlab/bnovak/ADFRsuite_x86_64Linux_1.0/bin' # Path to ADFR suite where prep scripts are #*Put scripts in your path instead
 
 # Adds vina charges to a ligand
 def preplig_vina(ligand):
-    os.chdir(path_lig)
-    sp.run(['%s/prepare_ligand' % executables, '-l', ligand,])
+    #os.chdir(path_lig)
+    sp.run(['prepare_ligand', '-l', ligand,])
     return print("Ligand has been converted to pdbqt file with vina charges")
 
 # Adds antechamber charges to the ligand pdb
@@ -35,12 +37,12 @@ def add_charges(ligand):
 # Converts to pdbqt using user provided charges
 def preplig(ligand):
     os.chdir(path_lig)
-    sp.run(['%s/prepare_ligand' % executables, '-l', ligand, '-C'])
+    sp.run(['prepare_ligand', '-l', ligand, '-C'])
     return print("Ligand has been converted to pdbqt file using provided charges")
 
 # Converts protein pdb to pdbqt file
 def prep_receptor(receptor, out, name):
-    sp.run(['%s/prepare_receptor' % executables, '-r', receptor, '-o', '%s/%sqt' % (out, name)])
+    sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%sqt' % (out, name)])
     return '%s/%sqt' % (out, name)
 
 # Aligns protein files using user provided atoms
@@ -58,9 +60,9 @@ charge_methods={
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument('protein_dir',
+parser.add_argument('-p','--protein_dir',
                     help='Path to protein directory')
-parser.add_argument('output',
+parser.add_argument('-o','--output',
                     help='Path to the output')
 parser.add_argument('-l','--ligand_dir',
                     help='Path to ligand directory')
@@ -89,10 +91,13 @@ except FileExistsError:
 
 # Checking whether ligands need to be prepared as well, by checking if --ligands_dir flag is set
 if args.ligand_dir is not None:
+    os.chdir(path_lig)
     print('Adding charges to the ligand')
-    ligands = sorted(glob.glob('%s/*pdb' % path_lig)) #TODO change so that either mol2 or a pdb can be input
+    ligands = sorted(glob.glob('*pdb')) #TODO change so that either mol2 or a pdb can be input
+    print(ligands)
     for ligand in ligands:
         charge_methods[args.charge](ligand)
+    os.chdir(home)
     #charged_ligands = list(pool.map(charge_methods[args.charge], ligands)) #! Currently not using map, because it makes all the ligands have the same atoms with different charges for yet unknown reason
     if args.charge == 'antechamber':
         charged_ligands = sorted(glob.glob('%s/*mol2' % path_lig))
@@ -101,24 +106,25 @@ else:
     print('Assuming ligands have been already converted to pdbqts with partial charges')
 
 # Aligning and converting protein pdbs to pdbqts
-if reference != 'None':
-    print('Aligning protein to reference')
-    reference_protein = md.load(reference)
-    frames = sorted(glob.glob('%s/*pdb' % path_prot)) 
-    prot_name = [frame.split('/')[-1] for frame in frames]
-    output_list = [path_output for l in range(len(frames))]
-    reference_protein = [reference_protein for l in range(len(frames))]
-    atoms = [args.atoms for l in range(len(frames))]
-    arguments = zip(frames, reference_protein, output_list,atoms)
-    aligned = list(pool.starmap(align, arguments))
-    arguments = zip(aligned, output_list, prot_name)
-    list(pool.starmap(prep_receptor, arguments))
-else:
-    frames = sorted(glob.glob('%s/*pdb' % path_prot))
-    prot_name = [frame.split('/')[-1] for frame in frames]
-    output_list = [path_output for l in range(len(frames))]
-    arguments = zip(frames, output_list,prot_name)
-    list(pool.starmap(prep_receptor, arguments))
+if args.protein_dir is not None: #Checking whether proteins should be converted too
+    if reference != 'None':
+        print('Aligning protein to reference')
+        reference_protein = md.load(reference)
+        frames = sorted(glob.glob('%s/*pdb' % path_prot)) 
+        prot_name = [frame.split('/')[-1] for frame in frames]
+        output_list = [path_output for l in range(len(frames))]
+        reference_protein = [reference_protein for l in range(len(frames))]
+        atoms = [args.atoms for l in range(len(frames))]
+        arguments = zip(frames, reference_protein, output_list,atoms)
+        aligned = list(pool.starmap(align, arguments))
+        arguments = zip(aligned, output_list, prot_name)
+        list(pool.starmap(prep_receptor, arguments))
+    else:
+        frames = sorted(glob.glob('%s/*pdb' % path_prot))
+        prot_name = [frame.split('/')[-1] for frame in frames]
+        output_list = [path_output for l in range(len(frames))]
+        arguments = zip(frames, output_list,prot_name)
+        list(pool.starmap(prep_receptor, arguments))
 
 pool.close()
 
