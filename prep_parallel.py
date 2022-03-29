@@ -2,10 +2,9 @@
 #########################################################################################################
 ## This script prepares both ligand and protein files for docking by using ADFR suite scripts.         ## 
 ## It uses multiprocessing to speed up the prep time.                                                  ##
-## It also aligns protein structures if needed, currently using backbone atoms                         ##
+## It also aligns protein structures if needed, using user provided atoms in -a                        ##
 #########################################################################################################
 
-#python prep_parallel.py -p /full/path/to/protein/files -l /full/path/to/ligands/files -o /full/path/to/output -a "no" if not aligning, /full/path/to/reference/structure/otherwise
 
 #TODO might be interesting to add the function of adding amber charges instead of only vina charges to the protein
 #* Fixed BUG by not using map: seems to convert all the ligands to a random ligand with different charges in each mol2 file - antechamber
@@ -24,7 +23,6 @@ home = os.getcwd()
 
 # Adds vina charges to a ligand
 def preplig_vina(ligand):
-    #os.chdir(path_lig)
     sp.run(['prepare_ligand', '-l', ligand,])
     return print("Ligand has been converted to pdbqt file with vina charges")
 
@@ -63,7 +61,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-p','--protein_dir',
                     help='Path to protein directory')
 parser.add_argument('-o','--output',
-                    help='Path to the output')
+                    help='Path to the output, only needed if proteins are being prepared')
 parser.add_argument('-l','--ligand_dir',
                     help='Path to ligand directory')
 parser.add_argument('-r','--reference', default='None',
@@ -80,7 +78,6 @@ path_prot = args.protein_dir
 path_output = args.output
 reference = args.reference
 
-protein_name = path_output.split('/')[-1]
 n_procs = mp.cpu_count()
 pool = mp.Pool(processes=n_procs)
 
@@ -91,10 +88,9 @@ except FileExistsError:
 
 # Checking whether ligands need to be prepared as well, by checking if --ligands_dir flag is set
 if args.ligand_dir is not None:
-    os.chdir(path_lig)
+    os.chdir(path_lig) #* There is probably a more elegant way than changing directories
     print('Adding charges to the ligand')
-    ligands = sorted(glob.glob('*pdb')) #TODO change so that either mol2 or a pdb can be input
-    print(ligands)
+    ligands = sorted(glob.glob('*pdb')) #TODO change so that either mol2 or a pdb can be input; might not be necessary
     for ligand in ligands:
         charge_methods[args.charge](ligand)
     os.chdir(home)
