@@ -1,5 +1,9 @@
 #!/bin/bash
 
+
+# This function is hard-coded to interact with the directory structure created by the docking parallel tools.
+# While its structure might be useful inspiration if you reorganized your data directories, it is unlikely to work
+# in the context of any real changes.
 extract_scores() {
     reference_path=$1
     ref_mol_name=$2
@@ -13,6 +17,7 @@ extract_scores() {
             if [[ -f $ordered_path_list ]]; then
                 rm $ordered_path_list
             fi
+            # create the outfile by (over)writing a header line
             echo '# trj frame score' > $outfn
             rep_counter=$((rep_counter + 1))
         done
@@ -40,17 +45,13 @@ extract_scores() {
     done
 }
 export -f extract_scores
-refpath=myh2
-suffix=44.65_91.42_53.83_14.0_12.0_18.0
+# first argument to this script is the reference msm path
+refpath=$1
+# shift indexing of arguments by one, to reflect that we've dealt with arg 1 already
+shift 1
+suffix=$1
+shift 1
 scoresuff=$suffix
 framesuff=$suffix.pdbqt
-#for mol in blebbistatin mt-{100..105} mt-{111..115} mt-{131..135}; do
-##for mol in blebbistatin; do
-#    extract_scores $refpath $mol $mol-scores
-#done
-for suffix in 44.65_91.42_53.83_14.0_12.0_18.0 38.65_93.42_53.83_24.0_18.0_22.0; do
-    scoresuff=$suffix
-    framesuff=$suffix.pdbqt
-    parallel --jobs 75% extract_scores $refpath {} {}-scores-$scoresuff $framesuff ::: \
-        blebbistatin mt-{100..105} mt-{111..115} mt-{131..135}
-done
+# use remaining args as compound names, run parallel extraction jobs for each
+parallel --jobs 75% extract_scores $refpath {} {}-scores-$scoresuff $framesuff ::: $@
