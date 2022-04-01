@@ -7,13 +7,16 @@
 extract_scores() {
     reference_path=$1
     ref_mol_name=$2
+    outfile_prefix=$3
     suffix=$4
+    awk_script=$5
+
     # clear out and write outfiles
     for trj in $reference_path/*; do
         rep_counter=0
         for rep in $trj/$ref_mol_name/*; do
-            outfn=$3-$rep_counter.dat
-            ordered_path_list=$3-$rep_counter.out
+            outfn=$outfile_prefix-$rep_counter.dat
+            ordered_path_list=$outfile_prefix-$rep_counter.out
             if [[ -f $ordered_path_list ]]; then
                 rm $ordered_path_list
             fi
@@ -26,15 +29,17 @@ extract_scores() {
     trj_counter=0
     for trj in $reference_path/*; do
         rep_counter=0
-        outfn=$3-$rep_counter.dat
-        ordered_path_list=$3-$rep_counter.out
+        outfn=$outfile_prefix-$rep_counter.dat
+        ordered_path_list=$outfile_prefix-$rep_counter.out
         echo $trj
         echo $trj/$ref_mol_name
         for rep in $trj/$ref_mol_name/*; do
             frame_counter=0
             echo $rep
-            for frame in $rep/frame*$suffix; do
-                score=$(awk '/REMARK VINA RESULT/ {print $4; exit}' $frame)
+            for frame in $rep/*$suffix; do
+                # use memory-mapped awk for better performance
+                score=$(mawk -f $awk_script $frame)
+                echo $score
                 echo $trj_counter $frame_counter $score >> $outfn
                 echo $frame >> $ordered_path_list
                 frame_counter=$((frame_counter + 1))
@@ -51,7 +56,25 @@ refpath=$1
 shift 1
 suffix=$1
 shift 1
+awk_script=$1
+# use heredocs to write awkscripts, so that there's no trouble with bash preemptively expanding awk variables.
+if [[ $awk_script == 'vina' ]]; then
+cat << 'EOF' > $awk_script.awk
+/REMARK VINA RESULT/ {print $4; exit}
+EOF
+awk_script=$awk_script.awk
+elif [[ $awk_script == 'smina' ]]; then
+cat << 'EOF' > $awk_script.awk
+/Result/ {print $3; exit}
+EOF
+awk_script=$awk_script.awk
+else
+    echo "Third argument (echoed below) is not one of 'smina' or 'vina'; interpreting as an awk command file name."
+    echo "$awk_script"
+    awk_script="$awk_script"
+fi
+shift 1
 scoresuff=$suffix
 framesuff=$suffix.pdbqt
 # use remaining args as compound names, run parallel extraction jobs for each
-parallel --jobs 75% extract_scores $refpath {} {}-scores-$scoresuff $framesuff ::: $@
+parallel --jobs 100% extract_scores $refpath {} {}-scores-$scoresuff $framesuff "$awk_script" ::: $@
