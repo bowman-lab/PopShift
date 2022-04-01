@@ -39,7 +39,6 @@ extract_scores() {
             for frame in $rep/*$suffix; do
                 # use memory-mapped awk for better performance
                 score=$(mawk -f $awk_script $frame)
-                echo $score
                 echo $trj_counter $frame_counter $score >> $outfn
                 echo $frame >> $ordered_path_list
                 frame_counter=$((frame_counter + 1))
@@ -54,7 +53,10 @@ export -f extract_scores
 refpath=$1
 # shift indexing of arguments by one, to reflect that we've dealt with arg 1 already
 shift 1
-suffix=$1
+# if this string is provided to the program as several suffixes
+# within quotes and separated by whitespace,
+# the script will iterate over each
+suffixes=$1
 shift 1
 awk_script=$1
 # use heredocs to write awkscripts, so that there's no trouble with bash preemptively expanding awk variables.
@@ -74,7 +76,9 @@ else
     awk_script="$awk_script"
 fi
 shift 1
-scoresuff=$suffix
-framesuff=$suffix.pdbqt
-# use remaining args as compound names, run parallel extraction jobs for each
-parallel --jobs 100% extract_scores $refpath {} {}-scores-$scoresuff $framesuff "$awk_script" ::: $@
+for suffix in $suffixes; do
+    scoresuff=$suffix
+    framesuff=$suffix.pdbqt
+    # use remaining args as compound names, run parallel extraction jobs for each
+    parallel --jobs 100% extract_scores $refpath {} {}-scores-$scoresuff $framesuff "$awk_script" ::: $@
+done
