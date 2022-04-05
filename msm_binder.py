@@ -99,6 +99,9 @@ def free_energy_per_state(frame_weights, reweights, rt):
 def kd_from_kcal_mol(fe, rt):
     return np.exp(fe / rt)
 
+def kcal_mol_from_kd(kd, rt):
+    return np.log(kd * rt)
+
 # reductions below here
 def msm_binding_dG(frame_weights, trimmed_binding_fes, rt):
     return - rt * np.log(np.sum(frame_weights * np.exp(-trimmed_binding_fes / rt)))
