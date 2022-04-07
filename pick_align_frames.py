@@ -91,6 +91,11 @@ parser.add_argument('--frames-per-bin', type=int, default=10,
 #                          'diversity. Value provided is minumum number of frames to take from least diverse state.')
 
 if __name__ == '__main__':
+    argv = [
+        "tmh2",
+        "/home/louis/bowmanlab/j.lotthammer/Simulations/myosin/specificity/pps-bleb-isoforms/myh2/input_files3/myh2-5n6a-holo-prot-masses.pdb",
+        '~/myosin/traj_files.txt'
+    ]
     args = parser.parse_args()
     assignments = ra.load(args.assignments)
     eq_probs = np.load(args.eq_probs)
