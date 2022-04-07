@@ -50,22 +50,12 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, out
 
     # now write everything out
     for (bin_ix, trj_ix, fra_ix), frame in zip(full_inds, subset_list):
-        bin_trj_file_names[bin_ix].writeFrame(frame),
+        bin_trj_file_names[bin_ix].writeFrame(frame)
         pdb = loos.PDB.fromAtomicGroup(frame)
         pdbfname =out_path + '/{}/{}-{}.pdb'.format(bin_ix, trj_ix, fra_ix)
         with open(pdbfname, "w") as f:
             f.write(str(pdb))
 
-
-
-
-
-
-
-
-
-
-chosen = get_random_per_bin(d, 200, 3, gen=gen)
 
 def read_traj_paths(traj_list_filename):
     with open(traj_list_filename) as f:
