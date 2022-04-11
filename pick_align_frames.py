@@ -133,14 +133,7 @@ if __name__ == '__main__':
         eq_probs = np.load(args.eq_probs)
     except ValueError:
         eq_probs = np.load(args.eq_probs, allow_pickle=True).item().eq_probs_
-    low_inds = np.where(np.bincount(assignments.flatten()) < args.frames_per_bin)
-    if len(low_inds[0]) > 0:
-        print('The(se) bin(s) have fewer than your requested samples in them:')
-        print(low_inds[0])
-        print('You requested this many frames per bin:')
-        print(args.frames_per_bin)
-        print('Exiting.')
-        exit(1)
+
     model = loos.createSystem(args.model)
     if args.make_receptor_sel_chain_A:
         for atom in model:
@@ -156,6 +149,14 @@ if __name__ == '__main__':
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
         align_sel += args.align_selection
     if type(args.frames_per_bin) == int:
+        low_inds = np.where(np.bincount(assignments.flatten()) < args.frames_per_bin)
+        if len(low_inds[0]) > 0:
+            print('The(se) bin(s) have fewer than your requested samples in them:')
+            print(low_inds[0])
+            print('You requested this many frames per bin:')
+            print(args.frames_per_bin)
+            print('Exiting.')
+            exit(1)
         chosen_frames = frame_selectors[args.frame_selector](
             assignments,
             eq_probs.shape[0],
