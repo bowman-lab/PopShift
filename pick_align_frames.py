@@ -132,6 +132,9 @@ if __name__ == '__main__':
         eq_probs = np.load(args.eq_probs)
     except ValueError:
         eq_probs = np.load(args.eq_probs, allow_pickle=True).item().eq_probs_
+    low_inds = np.where(np.bincount(assignments.flatten()) < args.frames_per_bin)
+    if len(low_inds[0]) > 0:
+        print('The(se) bin(s) have fewer than your requested samples in them:', low_inds[0])
     model = loos.createSystem(args.model)
     if args.make_receptor_sel_chain_A:
         for atom in model:
