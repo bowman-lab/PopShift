@@ -33,12 +33,12 @@ def get_random_per_bin(assignments, n_states, number_desired, replace=False, gen
     return chosen_inds
 
 
-def get_specific_number_per_bin(assignments, n_states, number_desired, replace=False, gen=np.random.default_rng()):
-    # assumes RA's traj axis is the outer one.S
-    all_state_indices = get_assign_inds(assignments, n_states)
-    chosen_inds = np.array([gen.choice(state_ixs, number_desired[i], axis=0, replace=replace)
-                            for i, state_ixs in enumerate(all_state_indices)])
-    return chosen_inds
+def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, replace=False, gen=np.random.default_rng()):
+    all_state_indices = get_assign_inds(assignments, nstates)
+    chosen_inds = (gen.choice(state_ixs, number_desired, axis=0, replace=replace)
+                   for state_ixs, number_desired in zip(all_state_indices, numbers_desired))
+    return list(chosen_inds)
+
 
 def rip_conformations(chosen_inds, model, subset_selection, align_selection, traj_paths):
     trajectories = [pyloos.Trajectory(traj_path, model, subset=subset_selection) for traj_path in traj_paths]
@@ -89,6 +89,7 @@ def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs):
 
 frame_selectors = {
     'random': get_random_per_bin,
+    'specified_totals': get_specified_number_per_bin_random
 }
 
 parser = argparse.ArgumentParser()
@@ -114,7 +115,7 @@ parser.add_argument('--subset-selection', type=str, default='all',
                     help='A loos selection string to subset all frames by (for example, if water is present it could be '
                          'stripped here).')
 
-parser.add_argument('--frames-per-bin', type=int, default=10,
+parser.add_argument('--frames-per-bin', default=10,
                     help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
                          'an error is thrown.')
 parser.add_argument('--align-resid-list', type=str, default=None,
@@ -154,10 +155,18 @@ if __name__ == '__main__':
         align_sel += Path(args.align_selection).read_text()
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
         align_sel += args.align_selection
-    chosen_frames = frame_selectors[args.frame_selector](
-        assignments,
-        eq_probs.shape[0],
-        args.frames_per_bin)
+    if type(args.frames_per_bin) == int:
+        chosen_frames = frame_selectors[args.frame_selector](
+            assignments,
+            eq_probs.shape[0],
+            args.frames_per_bin)
+    else:
+        frames_per_bin = np.load(args.frames_per_bin)
+        chosen_frames = frame_selectors[args.frame_selector](
+            assignments,
+            eq_probs.shape[0],
+            frames_per_bin
+        )
     if len(args.traj_paths) == 1:
         p_trjs = Path(args.traj_paths[0])
         if p_trjs.suffix == '.txt':
