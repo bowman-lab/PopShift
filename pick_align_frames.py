@@ -92,15 +92,20 @@ parser.add_argument('assignments', type=str,
                     help='h5 file with assignments associated to the MSM used.')
 parser.add_argument(metavar='eq_probs|pickled_msm', type=str, dest='eq_probs',
                     help='.npy file with equilibrium probabilities from MSM, or pickled MSM object.')
-parser.add_argument('traj_paths', type=str,
-                    help='A file containing a list of trajectories corresponding (in matching order) to the supplied '
-                         'assignments file.')
-parser.add_argument('align_selection', type=str,
-                    help='A file containing a loos selection string to align the selected frames with. Alternatively provide a selection string on the command line.')
-parser.add_argument('--subset-selection', type=str, default='all',
-                    help='A loos selection string to subset all frames by (for example, if water is present it could be stripped here).')
 parser.add_argument('frame_selector', type=str,
-                    choices=frame_selectors.keys())
+                    choices=frame_selectors.keys(),
+                    help='Strategy for selecting frames to represent each MSM bin.')
+parser.add_argument('align_selection', type=str,
+                    help='A file containing a loos selection string to align the selected frames with. Alternatively '
+                         'provide a selection string on the command line.')
+parser.add_argument('traj_paths', type=str, nargs='+',
+                    help='A file containing a list of trajectories corresponding (in matching order) to the supplied '
+                         'assignments file. Alternatively, paths to the trajectory files.')
+# Optional args below here
+parser.add_argument('--subset-selection', type=str, default='all',
+                    help='A loos selection string to subset all frames by (for example, if water is present it could be '
+                         'stripped here).')
+
 parser.add_argument('--frames-per-bin', type=int, default=10,
                     help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
                          'an error is thrown.')
@@ -137,7 +142,12 @@ if __name__ == '__main__':
         assignments,
         eq_probs.shape[0],
         args.frames_per_bin)
-    traj_paths = Path(args.traj_paths).read_text().split()
+    if len(args.traj_paths) == 1:
+        p_trjs = Path(args.traj_paths)
+        if p_trjs.suffix == '.txt':
+            traj_paths = Path(args.traj_paths).read_text().split()
+        else:
+            traj_path = p_trjs
     print('aligning with the following selection string:')
     print(align_sel)
     out_path = Path(args.receptor_name) / 'receptor'
