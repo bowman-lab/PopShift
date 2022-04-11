@@ -32,43 +32,51 @@ def get_specific_number_per_bin(assignments, n_states, number_desired, replace=F
                             for i, state_ixs in enumerate(all_state_indices)])
     return chosen_inds
 
-def rip_conformations(chosen_inds, model, subset_selection, align_selection, out_path, traj_paths):
-    trajectories = [pyloos.Trajectory(traj_path.rstrip(), model, subset=subset_selection) for traj_path in traj_paths]
+def rip_conformations(chosen_inds, model, subset_selection, align_selection, traj_paths):
+    trajectories = [pyloos.Trajectory(traj_path, model, subset=subset_selection) for traj_path in traj_paths]
     full_inds = []
-    subset_list = loos.AtomicGroupVector()
-    align_list = loos.AtomicGroupVector()
-    bin_trajs = []
+    subset_vec = loos.AtomicGroupVector()
+    align_vec = loos.AtomicGroupVector()
 
     # read selected frames into memory
     for bin_ix, samples in enumerate(chosen_inds):
-        p = Path(out_path + '/' + str(bin_ix))
-        p.mkdir(parents=True, exist_ok=True)  # This will operate like mkdir -pf; it will overwrite.
-        bin_trajs.append(loos.DCDWriter(out_path + '/' + str(bin_ix) +
-                                        '/samples.dcd'))
+
         for trj_ix, fra_ix in samples:
-            print(trj_ix, fra_ix)
             frame = trajectories[trj_ix].readFrame(fra_ix)
-            align_list.push_back(loos.selectAtoms(frame, align_selection).copy())
-            subset_list.push_back(frame.copy())
+            align_vec.push_back(loos.selectAtoms(frame, align_selection).copy())
+            subset_vec.push_back(frame.copy())
             full_inds.append((bin_ix, trj_ix, fra_ix))
 
-    alignment_result = loos.iterativeAlignmentPy(align_list)
-    # apply transforms here
-    loos.applyTransforms(subset_list, alignment_result.transforms)
-    print('Iterative alignment final RMSD', alignment_result.rmsd, 'after', alignment_result.iterations, 'iterations')
+    return full_inds, subset_vec, align_vec
 
-    # now write everything out
+
+def align_samples(subset_vec, align_vec):
+    # iteratively aligns AGs in group. Alignment result contains transforms to
+    # rotate/translate the aligned group into alignment with the target.
+    alignment_result = loos.iterativeAlignmentPy(align_vec)
+    # apply transforms here. This is done in-place
+    loos.applyTransforms(subset_vec, alignment_result.transforms)
+    print('Iterative alignment final RMSD', alignment_result.rmsd, 'after',
+          alignment_result.iterations, 'iterations')
+
+
+def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs):
+    # If out_path is already a path, then this returns it.
+    # If out_path is a string, turn it into a pathlib Path object here
+    op = Path(out_path)
+    prev_ix = -1
     for (bin_ix, trj_ix, fra_ix), frame in zip(full_inds, subset_list):
-        bin_trajs[bin_ix].writeFrame(frame)
+        bp = op / str(bin_ix)
+        # This will operate like mkdir -pf; it will overwrite.
+        bp.mkdir(parents=True, exist_ok=True)
+        if write_bin_trajs:
+            if prev_ix != bin_ix:
+                outtraj = loos.DCDWriter(str(bp / 'samples.dcd'))
+            outtraj.writeFrame(frame)
+            prev_ix = bin_ix
         pdb = loos.PDB.fromAtomicGroup(frame)
-        pdbfname = out_path + '/{}/{}-{}.pdb'.format(bin_ix, trj_ix, fra_ix)
-        with open(pdbfname, "w") as f:
-            f.write(str(pdb))
-
-
-def read_traj_paths(traj_list_filename):
-    with open(traj_list_filename) as f:
-        return f.readlines()
+        pdb_path = bp / '{}-{}.pdb'.format(trj_ix, fra_ix)
+        pdb_path.write_text(str(pdb))  # will close file handle after writing
 
 
 frame_selectors = {
@@ -82,7 +90,7 @@ parser.add_argument('model', type=str,
                     help='A loos-interpretable model file that will permit reading the trajectories in "traj_paths".')
 parser.add_argument('assignments', type=str,
                     help='h5 file with assignments associated to the MSM used.')
-parser.add_argument(metavar='eq_probs | pickled_msm', type=str, dest='eq_probs',
+parser.add_argument(metavar='eq_probs|pickled_msm', type=str, dest='eq_probs',
                     help='.npy file with equilibrium probabilities from MSM, or pickled MSM object.')
 parser.add_argument('traj_paths', type=str,
                     help='A file containing a list of trajectories corresponding (in matching order) to the supplied '
@@ -95,32 +103,17 @@ parser.add_argument('frame_selector', type=str,
                     choices=frame_selectors.keys())
 parser.add_argument('--frames-per-bin', type=int, default=10,
                     help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
-                         'an error is thrown. Overridden by "--proportional".')
+                         'an error is thrown.')
 parser.add_argument('--align-resid-list', type=str, default=None,
                     help='If provided, use numbers in file as a list of residue IDs. Concatenate align selection string '
                          'with one selecting these resids.')
 parser.add_argument('--make-receptor-sel-chain-A', action=argparse.BooleanOptionalAction,
                     help='If thrown, make all atoms a member of chain "A" when writing PDBs.')
-# parser.add_argument('--proportional', action=argparse.BooleanOptionalAction,
-#                   help='Compute number of frames to use for each state as a function of some heuristic scoring frame '
-#                          'diversity. Value provided is minumum number of frames to take from least diverse state.')
+parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
+                    help='If thrown, write a DCD with the selected frames in each bin directory.')
 
 if __name__ == '__main__':
-    argv = [
-        "--subset-selection",
-        "resid < 793",
-        "--make-receptor-sel-chain-A",
-        "--frames-per-bin",
-        "2",
-        "tmh2",
-        "/home/louis/testtrajs/myh2-5n6a-holo-prot-masses.pdb",
-        "/home/louis/myosin/myh2-5n6a-backbone-chi1-dihedrals-bleb-pocket-correlated-subset-charmm36-sims-lag-500-tica-reduced-k-200-cluster-dtrajs.h5",
-        "/home/louis/myosin/myh2-5n6a_input_features_backbone-chi1-dihedrals-bleb-pocket-correlated-subset-charmm36-sims_tica_lag_500_k_200.npy",
-        '/home/louis/myosin/traj_files.txt',
-        "/home/louis/myosin/myh2-5n6a-pocket-sel.txt",
-        "random"
-    ]
-    args = parser.parse_args(argv)
+    args = parser.parse_args()
     assignments = ra.load(args.assignments)
     try:
         eq_probs = np.load(args.eq_probs)
@@ -144,9 +137,14 @@ if __name__ == '__main__':
         assignments,
         eq_probs.shape[0],
         args.frames_per_bin)
-    traj_paths = read_traj_paths(args.traj_paths)
+    traj_paths = Path(args.traj_paths).read_text().split()
     print('aligning with the following selection string:')
     print(align_sel)
-    rip_conformations(chosen_frames, model, args.subset_selection, align_sel, args.receptor_name+'/receptor',
-                      traj_paths)
+    out_path = Path(args.receptor_name) / 'receptor'
+    full_inds, subset_vec, align_vec = rip_conformations(
+        chosen_frames, model, args.subset_selection, align_sel, traj_paths
+    )
+    align_samples(subset_vec, align_vec)
+    write_sampled_frames(subset_vec, full_inds, out_path, args.write_bin_trajs)
+
 
