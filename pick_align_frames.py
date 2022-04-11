@@ -35,36 +35,33 @@ def get_specific_number_per_bin(assignments, n_states, number_desired, replace=F
 def rip_conformations(chosen_inds, model, subset_selection, align_selection, out_path, traj_paths):
     trajectories = [pyloos.Trajectory(traj_path.rstrip(), model, subset=subset_selection) for traj_path in traj_paths]
     full_inds = []
-    subset_list = []
-    align_list = []
-    bin_trj_file_names = []
-    # cflat = chosen_inds.flatten()
-    # chosen_sort_inds = np.argsort(cflat, order=['traj', 'frame'])
-    # inverse_sort_inds = np.zeros_like(chosen_sort_inds, dtype=np.int32)
-    # inverse_sort_inds[chosen_sort_inds] = np.arange(inverse_sort_inds.shape[0], dtype=np.int32)
+    subset_list = loos.AtomicGroupVector()
+    align_list = loos.AtomicGroupVector()
+    bin_trajs = []
 
     # read selected frames into memory
     for bin_ix, samples in enumerate(chosen_inds):
         p = Path(out_path + '/' + str(bin_ix))
         p.mkdir(parents=True, exist_ok=True)  # This will operate like mkdir -pf; it will overwrite.
-        loos.DCDWriter(out_path + '/' + str(bin_ix) + '/samples.dcd')
+        bin_trajs.append(loos.DCDWriter(out_path + '/' + str(bin_ix) +
+                                        '/samples.dcd'))
         for trj_ix, fra_ix in samples:
             print(trj_ix, fra_ix)
             frame = trajectories[trj_ix].readFrame(fra_ix)
-            align_list.append(loos.selectAtoms(frame, align_selection))
-            subset_list.append(frame)
+            align_list.push_back(loos.selectAtoms(frame, align_selection).copy())
+            subset_list.push_back(frame.copy())
             full_inds.append((bin_ix, trj_ix, fra_ix))
 
-    xforms, rmsd, iters = pyloos.iterativeAlignment(align_list)
+    alignment_result = loos.iterativeAlignmentPy(align_list)
     # apply transforms here
-    loos.applyTransforms(subset_list, xforms)
-    print('Iterative alignment final RMSD', rmsd, 'after', iters, 'iterations')
+    loos.applyTransforms(subset_list, alignment_result.transforms)
+    print('Iterative alignment final RMSD', alignment_result.rmsd, 'after', alignment_result.iterations, 'iterations')
 
     # now write everything out
     for (bin_ix, trj_ix, fra_ix), frame in zip(full_inds, subset_list):
-        bin_trj_file_names.append(bin_trj_file_names[bin_ix].writeFrame(frame))
+        bin_trajs[bin_ix].writeFrame(frame)
         pdb = loos.PDB.fromAtomicGroup(frame)
-        pdbfname =out_path + '/{}/{}-{}.pdb'.format(bin_ix, trj_ix, fra_ix)
+        pdbfname = out_path + '/{}/{}-{}.pdb'.format(bin_ix, trj_ix, fra_ix)
         with open(pdbfname, "w") as f:
             f.write(str(pdb))
 
@@ -113,8 +110,10 @@ if __name__ == '__main__':
         "--subset-selection",
         "resid < 793",
         "--make-receptor-sel-chain-A",
+        "--frames-per-bin",
+        "2",
         "tmh2",
-        "/home/louis/bowmanlab/j.lotthammer/Simulations/myosin/specificity/pps-bleb-isoforms/myh2/earlier_runs/input_files/myh2-5n6a-holo-start.gro",
+        "/home/louis/testtrajs/myh2-5n6a-holo-prot-masses.pdb",
         "/home/louis/myosin/myh2-5n6a-backbone-chi1-dihedrals-bleb-pocket-correlated-subset-charmm36-sims-lag-500-tica-reduced-k-200-cluster-dtrajs.h5",
         "/home/louis/myosin/myh2-5n6a_input_features_backbone-chi1-dihedrals-bleb-pocket-correlated-subset-charmm36-sims_tica_lag_500_k_200.npy",
         '/home/louis/myosin/traj_files.txt',
