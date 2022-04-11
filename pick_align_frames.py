@@ -8,12 +8,20 @@ from loos import pyloos
 
 def get_assign_inds(assignments, nstates):
     index_list_by_bin = [[] for i in range(nstates)]
-    for i, t in enumerate(assignments):
-        for j, f in enumerate(t):
-            # iterating over RA assign contents produces singleton arrays of dtype=int32
-            # that need to be unpacked for use
-            bin_index = f[0]
-            index_list_by_bin[bin_index].append((i, j))
+    # handle the case where there is only 1 trajectory,
+    # meaning the ragged array doesn't have singleton elements at the tightest level.
+    if assignments.shape[0] == 1:
+        for i, t in enumerate(assignments):
+            for j, f in enumerate(t):
+                bin_index = f
+                index_list_by_bin[bin_index].append((i, j))
+    else:
+        for i, t in enumerate(assignments):
+            for j, f in enumerate(t):
+                # iterating over RA assign contents produces singleton arrays of dtype=int32
+                # that need to be unpacked for use
+                bin_index = f[0]
+                index_list_by_bin[bin_index].append((i, j))
     return [np.array(bin_indices, dtype=[('traj', np.int32), ('frame', np.int32)]) for bin_indices in index_list_by_bin]
 
 
@@ -148,6 +156,8 @@ if __name__ == '__main__':
             traj_paths = Path(args.traj_paths).read_text().split()
         else:
             traj_path = p_trjs
+    else:
+        traj_paths = args.traj_paths
     print('aligning with the following selection string:')
     print(align_sel)
     out_path = Path(args.receptor_name) / 'receptor'
