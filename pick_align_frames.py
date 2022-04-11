@@ -159,7 +159,7 @@ if __name__ == '__main__':
         eq_probs.shape[0],
         args.frames_per_bin)
     if len(args.traj_paths) == 1:
-        p_trjs = Path(args.traj_paths)
+        p_trjs = Path(args.traj_paths[0])
         if p_trjs.suffix == '.txt':
             traj_paths = Path(args.traj_paths).read_text().split()
         else:
