@@ -135,6 +135,8 @@ if __name__ == '__main__':
     low_inds = np.where(np.bincount(assignments.flatten()) < args.frames_per_bin)
     if len(low_inds[0]) > 0:
         print('The(se) bin(s) have fewer than your requested samples in them:', low_inds[0])
+        print('Exiting.')
+        exit(1)
     model = loos.createSystem(args.model)
     if args.make_receptor_sel_chain_A:
         for atom in model:
