@@ -148,7 +148,7 @@ if __name__ == '__main__':
         align_sel += Path(args.align_selection).read_text()
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
         align_sel += args.align_selection
-    if type(args.frames_per_bin) == int:
+    if isinstance(args.frames_per_bin, int):
         low_inds = np.where(np.bincount(assignments.flatten()) < args.frames_per_bin)
         if len(low_inds[0]) > 0:
             print('The(se) bin(s) have fewer than your requested samples in them:')
