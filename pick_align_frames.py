@@ -118,7 +118,7 @@ parser.add_argument('--subset-selection', type=str, default='all',
 parser.add_argument('--number-frames', default=10, type=int,
                     help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
                          'an error is thrown.')
-parser.add_argument('--totals-per-bin', default=None, type=str,
+parser.add_argument('--total-per-bin', default=None, type=str,
                     help='Text file with totals to draw from each MSM bin. Should be one column of totals, '
                          'where the row index corresponds to the bin and the entry is the number of frames to draw.')
 parser.add_argument('--align-resid-list', type=str, default=None,
