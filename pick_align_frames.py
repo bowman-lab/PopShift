@@ -115,9 +115,11 @@ parser.add_argument('--subset-selection', type=str, default='all',
                     help='A loos selection string to subset all frames by (for example, if water is present it could be '
                          'stripped here).')
 
-parser.add_argument('--frames-per-bin', default=10,
+parser.add_argument('--number-frames', default=10, type=int,
                     help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
                          'an error is thrown.')
+parser.add_argument('--totals-per-bin', default=None, type=str,
+                    help='Numpy (text) file with totals to draw from each MSM bin.')
 parser.add_argument('--align-resid-list', type=str, default=None,
                     help='If provided, use numbers in file as a list of residue IDs. Concatenate align selection string '
                          'with one selecting these resids.')
@@ -148,10 +150,19 @@ if __name__ == '__main__':
         align_sel += Path(args.align_selection).read_text()
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
         align_sel += args.align_selection
-    if isinstance(args.frames_per_bin, int):
-        low_inds = np.where(np.bincount(assignments.flatten()) < args.frames_per_bin)
+    if args.total_per_bin:
+        frames_per_bin = np.load(args.frames_per_bin)
+        chosen_frames = frame_selectors[args.frame_selector](
+            assignments,
+            eq_probs.shape[0],
+            frames_per_bin
+        )
+    else:
+        low_inds = np.where(
+            np.bincount(assignments.flatten()) < args.frames_per_bin)
         if len(low_inds[0]) > 0:
-            print('The(se) bin(s) have fewer than your requested samples in them:')
+            print(
+                'The(se) bin(s) have fewer than your requested samples in them:')
             print(low_inds[0])
             print('You requested this many frames per bin:')
             print(args.frames_per_bin)
@@ -161,13 +172,7 @@ if __name__ == '__main__':
             assignments,
             eq_probs.shape[0],
             args.frames_per_bin)
-    else:
-        frames_per_bin = np.load(args.frames_per_bin)
-        chosen_frames = frame_selectors[args.frame_selector](
-            assignments,
-            eq_probs.shape[0],
-            frames_per_bin
-        )
+
     if len(args.traj_paths) == 1:
         p_trjs = Path(args.traj_paths[0])
         if p_trjs.suffix == '.txt':
