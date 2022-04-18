@@ -119,7 +119,8 @@ parser.add_argument('--number-frames', default=10, type=int,
                     help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
                          'an error is thrown.')
 parser.add_argument('--totals-per-bin', default=None, type=str,
-                    help='Numpy (text) file with totals to draw from each MSM bin.')
+                    help='Text file with totals to draw from each MSM bin. Should be one column of totals, '
+                         'where the row index corresponds to the bin and the entry is the number of frames to draw.')
 parser.add_argument('--align-resid-list', type=str, default=None,
                     help='If provided, use numbers in file as a list of residue IDs. Concatenate align selection string '
                          'with one selecting these resids.')
@@ -151,7 +152,7 @@ if __name__ == '__main__':
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
         align_sel += args.align_selection
     if args.total_per_bin:
-        frames_per_bin = np.load(args.frames_per_bin)
+        frames_per_bin = np.loadtxt(args.total_per_bin)
         chosen_frames = frame_selectors[args.frame_selector](
             assignments,
             eq_probs.shape[0],
