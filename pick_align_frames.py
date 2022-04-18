@@ -152,27 +152,27 @@ if __name__ == '__main__':
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
         align_sel += args.align_selection
     if args.total_per_bin:
-        frames_per_bin = np.loadtxt(args.total_per_bin)
+        total_per_bin = np.loadtxt(args.total_per_bin)
         chosen_frames = frame_selectors[args.frame_selector](
             assignments,
             eq_probs.shape[0],
-            frames_per_bin
+            total_per_bin
         )
     else:
         low_inds = np.where(
-            np.bincount(assignments.flatten()) < args.frames_per_bin)
+            np.bincount(assignments.flatten()) < args.number_frames)
         if len(low_inds[0]) > 0:
             print(
                 'The(se) bin(s) have fewer than your requested samples in them:')
             print(low_inds[0])
             print('You requested this many frames per bin:')
-            print(args.frames_per_bin)
+            print(args.number_frames)
             print('Exiting.')
             exit(1)
         chosen_frames = frame_selectors[args.frame_selector](
             assignments,
             eq_probs.shape[0],
-            args.frames_per_bin)
+            args.number_frames)
 
     if len(args.traj_paths) == 1:
         p_trjs = Path(args.traj_paths[0])
