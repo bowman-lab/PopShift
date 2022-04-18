@@ -152,7 +152,7 @@ if __name__ == '__main__':
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
         align_sel += args.align_selection
     if args.total_per_bin:
-        total_per_bin = np.loadtxt(args.total_per_bin)
+        total_per_bin = np.loadtxt(args.total_per_bin, dtype=int)
         chosen_frames = frame_selectors[args.frame_selector](
             assignments,
             eq_probs.shape[0],
