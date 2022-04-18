@@ -20,7 +20,7 @@ def get_assign_inds(assignments, nstates):
             for j, f in enumerate(t):
                 # iterating over RA assign contents produces singleton arrays of dtype=int32
                 # that need to be unpacked for use
-                bin_index = f[0]
+                bin_index = f
                 index_list_by_bin[bin_index].append((i, j))
     return [np.array(bin_indices, dtype=[('traj', np.int32), ('frame', np.int32)]) for bin_indices in index_list_by_bin]
 
