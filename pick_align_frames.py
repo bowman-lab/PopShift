@@ -42,7 +42,7 @@ def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, r
 
 
 def get_centers(assigs, nstates, nd):
-    return list((0, i) for i in range(nstates))
+    return np.array([[0, i] for i in range(nstates)]).reshape(nstates, 1, 2)
 
 
 def unpickle_resave_centers(centersfn):
