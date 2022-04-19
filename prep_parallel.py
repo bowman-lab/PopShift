@@ -16,6 +16,7 @@ import mdtraj as md
 import argparse
 import glob
 import multiprocessing as mp
+from pathlib import Path
 
 home = os.getcwd()
 
@@ -40,8 +41,8 @@ def preplig(ligand):
 
 # Converts protein pdb to pdbqt file
 def prep_receptor(receptor, out, name):
-    sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%sqt' % (out, name)])
-    return '%s/%sqt' % (out, name)
+    sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%s.pdbqt' % (out, name)])
+    return '%s/%s.pdbqt' % (out, name)
 
 # Aligns protein files using user provided atoms
 # def align(protein_file,reference_file,output, atoms):
@@ -96,11 +97,11 @@ else:
 # Aligning and converting protein pdbs to pdbqts
 if args.protein_dir is not None: #Checking whether proteins should be converted too
     frames = sorted(glob.glob('%s/receptor/*/*pdb' % path_prot))
-    
-    # prot_name = [frame.split('/')[-1] for frame in frames]
-    # output_list = [path_output for l in range(len(frames))]
-    # arguments = zip(frames, output_list,prot_name)
-    # list(pool.starmap(prep_receptor, arguments))
+    prot_name = [Path(frame).stem for frame in frames]
+    directory = [os.path.dirname(frame) for frame in frames]
+    #output_list = ['%s/%s.pdbqt' % (directory[i],prot_name[i]) for i in range(len(directory))]
+    arguments = zip(frames, directory,prot_name)
+    list(pool.starmap(prep_receptor, arguments))
 
 pool.close()
 
