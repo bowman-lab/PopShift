@@ -111,8 +111,7 @@ parser.add_argument('receptor_name', type=str,
                     help="Name to use to use as top-level directory for the docking run tree.")
 parser.add_argument('model', type=str,
                     help='A loos-interpretable model file that will permit reading the trajectories in "traj_paths".')
-parser.add_argument('assignments', type=str,
-                    help='h5 file with assignments associated to the MSM used.')
+
 parser.add_argument(metavar='eq_probs|pickled_msm', type=str, dest='eq_probs',
                     help='.npy file with equilibrium probabilities from MSM, or pickled MSM object.')
 parser.add_argument('frame_selector', type=str,
@@ -125,6 +124,8 @@ parser.add_argument('traj_paths', type=str, nargs='+',
                     help='A file containing a list of trajectories corresponding (in matching order) to the supplied '
                          'assignments file. Alternatively, paths to the trajectory files.')
 # Optional args below here
+parser.add_argument('--assignments', type=str, default=None,
+                    help='h5 file with assignments from which MSM was built. Obligatory unless using "centers" selector.' )
 parser.add_argument('--subset-selection', type=str, default='all',
                     help='A loos selection string to subset all frames by (for example, if water is present it could be '
                          'stripped here).')
@@ -151,7 +152,7 @@ if __name__ == '__main__':
         eq_probs = np.load(args.eq_probs, allow_pickle=True).item().eq_probs_
 
     if args.frame_selector == 'centers':
-        assignments = list(range(eq_probs.shape[0]))
+        assignments = np.arange(eq_probs.shape[0])
     else:
         assignments = ra.load(args.assignments)
     model = loos.createSystem(args.model)
@@ -168,14 +169,12 @@ if __name__ == '__main__':
         align_sel += Path(args.align_selection).read_text()
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
         align_sel += args.align_selection
+
+    # get frame counts, however it's prescribed
     if args.total_per_bin:
-        total_per_bin = np.loadtxt(args.total_per_bin, dtype=int)
-        chosen_frames = frame_selectors[args.frame_selector](
-            assignments,
-            eq_probs.shape[0],
-            total_per_bin
-        )
-    else:
+        frame_counts = np.loadtxt(args.total_per_bin, dtype=int)
+
+    elif args.assignments:
         low_inds = np.where(
             np.bincount(assignments.flatten()) < args.number_frames)
         if len(low_inds[0]) > 0:
@@ -186,10 +185,16 @@ if __name__ == '__main__':
             print(args.number_frames)
             print('Exiting.')
             exit(1)
-        chosen_frames = frame_selectors[args.frame_selector](
-            assignments,
-            eq_probs.shape[0],
-            args.number_frames)
+
+        frame_counts = args.number_frames
+    else:
+        frame_counts = 1
+
+    chosen_frames = frame_selectors[args.frame_selector](
+        assignments,
+        eq_probs.shape[0],
+        frame_counts
+    )
 
     if len(args.traj_paths) == 1:
         p_trjs = Path(args.traj_paths[0])
