@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 from enspara import ra
+from enspara.util.load import concatenate_trjs
 import loos
 from loos import pyloos
 
@@ -38,6 +39,18 @@ def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, r
     chosen_inds = (gen.choice(state_ixs, number_desired, axis=0, replace=replace)
                    for state_ixs, number_desired in zip(all_state_indices, numbers_desired))
     return list(chosen_inds)
+
+
+def get_centers(_, nstates, _):
+    return list(range(nstates))
+
+
+def unpickle_resave_centers(centersfn):
+    cens = concatenate_trjs(np.load(centersfn, allow_pickle=True))
+    fstem = Path(centersfn).stem
+    newname = fstem + '.xtc'
+    cens.save(newname)
+    return newname
 
 
 def rip_conformations(chosen_inds, model, subset_selection, align_selection, traj_paths):
@@ -89,7 +102,8 @@ def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs):
 
 frame_selectors = {
     'random': get_random_per_bin,
-    'specified_totals': get_specified_number_per_bin_random
+    'specified_totals': get_specified_number_per_bin_random,
+    'centers': get_centers
 }
 
 parser = argparse.ArgumentParser()
@@ -131,12 +145,15 @@ parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    assignments = ra.load(args.assignments)
     try:
         eq_probs = np.load(args.eq_probs)
     except ValueError:
         eq_probs = np.load(args.eq_probs, allow_pickle=True).item().eq_probs_
 
+    if args.frame_selector == 'centers':
+        assignments = list(range(eq_probs.shape[0]))
+    else:
+        assignments = ra.load(args.assignments)
     model = loos.createSystem(args.model)
     if args.make_receptor_sel_chain_A:
         for atom in model:
@@ -178,6 +195,8 @@ if __name__ == '__main__':
         p_trjs = Path(args.traj_paths[0])
         if p_trjs.suffix == '.txt':
             traj_paths = p_trjs.read_text().split()
+        elif p_trjs.suffix == '.pickle':
+            traj_paths = unpickle_resave_centers(p_trjs)
         else:
             traj_path = p_trjs
     else:
