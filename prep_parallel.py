@@ -73,10 +73,10 @@ path_prot = args.protein_dir
 n_procs = mp.cpu_count()
 pool = mp.Pool(processes=n_procs)
 
-try:
-    os.makedirs('%s' % path_output)
-except FileExistsError:
-    pass
+# try:
+#     os.makedirs('%s' % path_output)
+# except FileExistsError:
+#     pass
 
 # Checking whether ligands need to be prepared as well, by checking if --ligands_dir flag is set
 if args.ligand_dir is not None:
@@ -95,23 +95,12 @@ else:
 
 # Aligning and converting protein pdbs to pdbqts
 if args.protein_dir is not None: #Checking whether proteins should be converted too
-    # if reference != 'None':
-    #     print('Aligning protein to reference')
-    #     reference_protein = md.load(reference)
-    #     frames = sorted(glob.glob('%s/*pdb' % path_prot)) 
-    #     prot_name = [frame.split('/')[-1] for frame in frames]
-    #     output_list = [path_output for l in range(len(frames))]
-    #     reference_protein = [reference_protein for l in range(len(frames))]
-    #     atoms = [args.atoms for l in range(len(frames))]
-    #     arguments = zip(frames, reference_protein, output_list,atoms)
-    #     aligned = list(pool.starmap(align, arguments))
-    #     arguments = zip(aligned, output_list, prot_name)
-    #     list(pool.starmap(prep_receptor, arguments))
-    frames = sorted(glob.glob('%s/*pdb' % path_prot))
-    prot_name = [frame.split('/')[-1] for frame in frames]
-    output_list = [path_output for l in range(len(frames))]
-    arguments = zip(frames, output_list,prot_name)
-    list(pool.starmap(prep_receptor, arguments))
+    frames = sorted(glob.glob('%s/receptor/*/*pdb' % path_prot))
+    
+    # prot_name = [frame.split('/')[-1] for frame in frames]
+    # output_list = [path_output for l in range(len(frames))]
+    # arguments = zip(frames, output_list,prot_name)
+    # list(pool.starmap(prep_receptor, arguments))
 
 pool.close()
 
