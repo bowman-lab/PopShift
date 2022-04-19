@@ -44,13 +44,13 @@ def prep_receptor(receptor, out, name):
     return '%s/%sqt' % (out, name)
 
 # Aligns protein files using user provided atoms
-def align(protein_file,reference_file,output, atoms):
-    pdb = md.load(protein_file)
-    atoms = pdb.topology.select(atoms)
-    aligned = pdb.superpose(reference_file, atom_indices=atoms)
-    prot_name = protein_file.split('/')[-1].split('.')[0]
-    aligned.save_pdb('%s/%s_aligned.pdb' % (output,prot_name))
-    return '%s/%s_aligned.pdb' % (output, prot_name)
+# def align(protein_file,reference_file,output, atoms):
+#     pdb = md.load(protein_file)
+#     atoms = pdb.topology.select(atoms)
+#     aligned = pdb.superpose(reference_file, atom_indices=atoms)
+#     prot_name = protein_file.split('/')[-1].split('.')[0]
+#     aligned.save_pdb('%s/%s_aligned.pdb' % (output,prot_name))
+#     return '%s/%s_aligned.pdb' % (output, prot_name)
 
 charge_methods={
     'vina': preplig_vina,
@@ -103,24 +103,23 @@ else:
 
 # Aligning and converting protein pdbs to pdbqts
 if args.protein_dir is not None: #Checking whether proteins should be converted too
-    if reference != 'None':
-        print('Aligning protein to reference')
-        reference_protein = md.load(reference)
-        frames = sorted(glob.glob('%s/*pdb' % path_prot)) 
-        prot_name = [frame.split('/')[-1] for frame in frames]
-        output_list = [path_output for l in range(len(frames))]
-        reference_protein = [reference_protein for l in range(len(frames))]
-        atoms = [args.atoms for l in range(len(frames))]
-        arguments = zip(frames, reference_protein, output_list,atoms)
-        aligned = list(pool.starmap(align, arguments))
-        arguments = zip(aligned, output_list, prot_name)
-        list(pool.starmap(prep_receptor, arguments))
-    else:
-        frames = sorted(glob.glob('%s/*pdb' % path_prot))
-        prot_name = [frame.split('/')[-1] for frame in frames]
-        output_list = [path_output for l in range(len(frames))]
-        arguments = zip(frames, output_list,prot_name)
-        list(pool.starmap(prep_receptor, arguments))
+    # if reference != 'None':
+    #     print('Aligning protein to reference')
+    #     reference_protein = md.load(reference)
+    #     frames = sorted(glob.glob('%s/*pdb' % path_prot)) 
+    #     prot_name = [frame.split('/')[-1] for frame in frames]
+    #     output_list = [path_output for l in range(len(frames))]
+    #     reference_protein = [reference_protein for l in range(len(frames))]
+    #     atoms = [args.atoms for l in range(len(frames))]
+    #     arguments = zip(frames, reference_protein, output_list,atoms)
+    #     aligned = list(pool.starmap(align, arguments))
+    #     arguments = zip(aligned, output_list, prot_name)
+    #     list(pool.starmap(prep_receptor, arguments))
+    frames = sorted(glob.glob('%s/*pdb' % path_prot))
+    prot_name = [frame.split('/')[-1] for frame in frames]
+    output_list = [path_output for l in range(len(frames))]
+    arguments = zip(frames, output_list,prot_name)
+    list(pool.starmap(prep_receptor, arguments))
 
 pool.close()
 
