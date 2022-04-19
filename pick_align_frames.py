@@ -197,13 +197,14 @@ if __name__ == '__main__':
     )
 
     if len(args.traj_paths) == 1:
+        traj_paths = []
         p_trjs = Path(args.traj_paths[0])
         if p_trjs.suffix == '.txt':
             traj_paths = p_trjs.read_text().split()
         elif p_trjs.suffix == '.pickle':
-            traj_paths = unpickle_resave_centers(p_trjs)
+            traj_paths.append(unpickle_resave_centers(p_trjs))
         else:
-            traj_paths = p_trjs
+            traj_paths.append(p_trjs)
     else:
         traj_paths = args.traj_paths
     print('aligning with the following selection string:')
