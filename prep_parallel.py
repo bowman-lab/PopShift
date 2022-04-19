@@ -74,11 +74,6 @@ path_prot = args.protein_dir
 n_procs = mp.cpu_count()
 pool = mp.Pool(processes=n_procs)
 
-# try:
-#     os.makedirs('%s' % path_output)
-# except FileExistsError:
-#     pass
-
 # Checking whether ligands need to be prepared as well, by checking if --ligands_dir flag is set
 if args.ligand_dir is not None:
     os.chdir(path_lig) #* There is probably a more elegant way than changing directories
