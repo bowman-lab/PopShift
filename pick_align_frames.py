@@ -41,7 +41,7 @@ def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, r
     return list(chosen_inds)
 
 
-def get_centers(_, nstates, _):
+def get_centers(assigs, nstates, nd):
     return list(range(nstates))
 
 
@@ -198,7 +198,7 @@ if __name__ == '__main__':
         elif p_trjs.suffix == '.pickle':
             traj_paths = unpickle_resave_centers(p_trjs)
         else:
-            traj_path = p_trjs
+            traj_paths = p_trjs
     else:
         traj_paths = args.traj_paths
     print('aligning with the following selection string:')
