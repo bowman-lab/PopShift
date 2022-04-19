@@ -60,14 +60,8 @@ charge_methods={
 parser = argparse.ArgumentParser()
 parser.add_argument('-p','--protein_dir',
                     help='Path to protein directory')
-parser.add_argument('-o','--output',
-                    help='Path to the output, only needed if proteins are being prepared')
 parser.add_argument('-l','--ligand_dir',
                     help='Path to ligand directory')
-parser.add_argument('-r','--reference', default='None',
-                    help='Path to reference structure to use if aligning')
-parser.add_argument('-a','--atoms', default='backbone',
-                    help='What atoms to use for aligning. Default: backbone')
 parser.add_argument('-c','--charge', default='vina',
                     choices=['antechamber', 'vina'],
                     help='What charges to add the ligand, Default: vina')
@@ -75,8 +69,6 @@ parser.add_argument('-c','--charge', default='vina',
 args = parser.parse_args()
 path_lig = args.ligand_dir
 path_prot = args.protein_dir
-path_output = args.output
-reference = args.reference
 
 n_procs = mp.cpu_count()
 pool = mp.Pool(processes=n_procs)
