@@ -1,4 +1,4 @@
-
+from jug import TaskGenerator
 from vina import Vina
 from functools import partial
 import os
@@ -6,9 +6,9 @@ import argparse
 import glob
 import subprocess as sp
 import multiprocessing as mp
-import path
+from pathlib import Path
 
-
+@TaskGenerator
 def coordreader(s, delim=','):
     try:
         x, y, z = map(float, s.split(delim))
@@ -16,8 +16,10 @@ def coordreader(s, delim=','):
     except:
        raise argparse.ArgumentTypeError("Center-coordinates and dimensions must be specified as 'x,y,z'")
 
+
+@TaskGenerator
 def dock_vina(box_center, box_size, exhaustiveness, receptor, ligand, ligand_name, output):
-    receptor_name = path.Path(receptor).stem
+    receptor_name = Path(receptor).stem
     v = Vina(sf_name='vina',cpu=exhaustiveness)
     v.set_receptor(receptor)
     v.set_ligand_from_file(ligand)
@@ -36,8 +38,9 @@ def dock_vina(box_center, box_size, exhaustiveness, receptor, ligand, ligand_nam
     )
     v.write_poses(fname, n_poses=1,overwrite=True)
 
+@TaskGenerator
 def dock_smina(box_center, box_size, exhaustiveness, receptor, ligand, ligand_name, output):
-    receptor_name = path.Path(receptor).stem
+    receptor_name = Path(receptor).stem
     fname = '{}/{}-{}-{:.2f}_{:.2f}_{:.2f}_{}_{}_{}_smina.pdbqt'.format(
         output,
         receptor_name,
@@ -101,7 +104,7 @@ except FileExistsError:
     pass
 
 for ligand in sorted(glob.glob('%s/*pdbqt' % path_lig)):
-    ligand_name = path.Path(ligand).stem
+    ligand_name = Path(ligand).stem
     for replica in range(args.replicas):
         try:
             os.makedirs('%s/%s/replica%s' % (path_output,ligand_name,replica))
