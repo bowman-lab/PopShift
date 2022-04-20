@@ -159,6 +159,7 @@ if __name__ == '__main__':
         assignments = ra.load(args.assignments)
     model = loos.createSystem(args.model)
     if not model.hasBonds():
+        print('Bond specifiers not found in model file. Defining bonds using', args.find_bonds, 'angstrom cut-off.')
         model.findBonds(args.find_bonds)
     if args.make_receptor_sel_chain_A:
         for atom in model:
