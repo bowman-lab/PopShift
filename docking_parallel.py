@@ -70,16 +70,18 @@ docking_methods = {
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument('ligand_dir',
-                    help='Path to ligand directory')
+
 parser.add_argument('protein_dir',
                     help='Path to protein directory')
-parser.add_argument('output',
-                    help='Path to the output')
+parser.add_argument('out_dir',
+                    help='Path to the output. By convention, the name of the docking run including info like box size '
+                         'if multiple are being tested.')
 parser.add_argument('box_center', type=coordreader,
                     help='Comma delimited string listing x,y,z of box center')
 parser.add_argument('box_size', type=coordreader,
                     help='Comma delimited string listing lx,ly,lz as the lengths of the x, y and z box-sides.')
+parser.add_argument('ligand_list', nargs="+",
+                    help='Path(s) to ligand pdbqts. Alternatively a txt file with a ligand path on each line.')
 parser.add_argument('-r', '--replicas', type=int, default=1,
                     help='Number of replica docking runs to perform. Default: 1')
 parser.add_argument('-e', '--exhaustiveness', type=int, default=32,
@@ -92,18 +94,25 @@ parser.add_argument('-d','--docking_algorithm', default='vina',
 
 
 args = parser.parse_args()
-path_lig = args.ligand_dir
+if len(args.ligand_list) == 1:
+    ligand_list_path = Path(args.ligand_list[0])
+    if ligand_list_path.suffix != '.pdbqt':
+        ligand_paths = ligand_list_path.read_txt().split()
+    else:
+        ligand_paths = args.ligand_list
+else:
+    ligand_paths = args.ligand_list
 path_prot = args.protein_dir
 path_output = args.output
 n_procs = mp.cpu_count() #TODO Need to check whether this takes cpu count of the node, or the number of cpus requested
-pool = mp.Pool(processes=int(n_procs/args.exhaustiveness)) #if the above function gets the # of CPUs requested, this should work 
+pool = mp.Pool(processes=int(n_procs/args.exhaustiveness)) #if the above function gets the # of CPUs requested, this should work
 
 try:
     os.makedirs('%s' % path_output)
 except FileExistsError:
     pass
 
-for ligand in sorted(glob.glob('%s/*pdbqt' % path_lig)):
+for ligand in ligand_paths:
     ligand_name = Path(ligand).stem
     for replica in range(args.replicas):
         try:
