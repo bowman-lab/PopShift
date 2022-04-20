@@ -48,35 +48,10 @@ def dock_smina(box_center, box_size, exhaustiveness, receptor_path, ligand_path,
         '--out', output_fn], shell=True, check=True)
 
 
-@TaskGenerator
-def dock_ligands_to_frames(output_paths, frame_paths, ligand_paths, box_center, box_size, exhaustiveness, docking_function):
-    for run_path in output_paths:
-    for ligand in ligand_paths:
-        lig_path = Path(ligand)
-        ligand_name = lig_path.stem
-        lig_output_path = run_path / ligand_name
-        for frame_path in frame_paths:
-            docked_lig_path = lig_output_path.joinpath(*frame_path.parts[1:])
-            docked_dir_path = docked_lig_path.parent
-            if not docked_dir_path.is_dir():
-                docked_dir_path.mkdir(exist_ok=True, parents=True)
-            if not args.dry_run:
-                Task(docking_function(
-                    args.box_center,
-                    args.box_size,
-                    args.exhaustiveness,
-                    frame_path,
-                    lig_path,
-                    docked_lig_path
-                ))
-
-
 docking_methods = {
     'vina': dock_vina,
     'smina': dock_smina,
 }
-
-
 
 
 parser = argparse.ArgumentParser()
