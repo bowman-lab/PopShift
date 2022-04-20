@@ -5,8 +5,6 @@
 ## It also aligns protein structures if needed, using user provided atoms in -a                        ##
 #########################################################################################################
 
-
-#TODO might be interesting to add the function of adding amber charges instead of only vina charges to the protein
 #* Fixed BUG by not using map: seems to convert all the ligands to a random ligand with different charges in each mol2 file - antechamber
 
 import os
@@ -43,15 +41,6 @@ def preplig(ligand):
 def prep_receptor(receptor, out, name):
     sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%s.pdbqt' % (out, name)])
     return '%s/%s.pdbqt' % (out, name)
-
-# Aligns protein files using user provided atoms
-# def align(protein_file,reference_file,output, atoms):
-#     pdb = md.load(protein_file)
-#     atoms = pdb.topology.select(atoms)
-#     aligned = pdb.superpose(reference_file, atom_indices=atoms)
-#     prot_name = protein_file.split('/')[-1].split('.')[0]
-#     aligned.save_pdb('%s/%s_aligned.pdb' % (output,prot_name))
-#     return '%s/%s_aligned.pdb' % (output, prot_name)
 
 charge_methods={
     'vina': preplig_vina,
