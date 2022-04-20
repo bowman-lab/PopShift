@@ -143,6 +143,8 @@ parser.add_argument('--make-receptor-sel-chain-A', action=argparse.BooleanOption
                     help='If thrown, make all atoms a member of chain "A" when writing PDBs.')
 parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
                     help='If thrown, write a DCD with the selected frames in each bin directory.')
+parser.add_argument('--find-bonds', type=float, default=1.65,
+                    help='If no bonds (connect records) are provided in model, then find bonds using provided distance.')
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -156,6 +158,8 @@ if __name__ == '__main__':
     else:
         assignments = ra.load(args.assignments)
     model = loos.createSystem(args.model)
+    if not model.hasBonds():
+        model.findBonds(args.find_bonds)
     if args.make_receptor_sel_chain_A:
         for atom in model:
             atom.chainId('A')
@@ -178,8 +182,7 @@ if __name__ == '__main__':
         low_inds = np.where(
             np.bincount(assignments.flatten()) < args.number_frames)
         if len(low_inds[0]) > 0:
-            print(
-                'The(se) bin(s) have fewer than your requested samples in them:')
+            print('The(se) bin(s) have fewer than your requested samples in them:')
             print(low_inds[0])
             print('You requested this many frames per bin:')
             print(args.number_frames)
