@@ -116,7 +116,7 @@ for run_path in output_paths:
         ligand_name = lig_path.stem
         lig_output_path = run_path / ligand_name
         for frame_path in frame_paths:
-            docked_lig_path = lig_output_path.joinpath(*frame_path.parts[1:])
+            docked_lig_path = lig_output_path.joinpath(*frame_path.parts[2:])
             docked_dir_path = docked_lig_path.parent
             if not docked_dir_path.is_dir():
                 docked_dir_path.mkdir(exist_ok=True, parents=True)
