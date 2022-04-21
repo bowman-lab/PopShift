@@ -10,7 +10,6 @@
 import os
 import subprocess as sp
 import sys
-import mdtraj as md
 import argparse
 import glob
 import multiprocessing as mp
@@ -57,6 +56,9 @@ parser.add_argument('-c','--charge', default='vina',
                     help='What charges to add the ligand, Default: vina')
 
 args = parser.parse_args()
+if len(sys.argv) < 2:
+    parser.print_help()
+    exit(0)
 path_lig = args.ligand_dir
 path_prot = args.protein_dir
 
