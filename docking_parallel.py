@@ -121,12 +121,12 @@ for run_path in output_paths:
             if not docked_dir_path.is_dir():
                 docked_dir_path.mkdir(exist_ok=True, parents=True)
             if not args.dry_run:
-                Task(docking_methods[args.docking_algorithm](
+                docking_methods[args.docking_algorithm](
                     args.box_center,
                     args.box_size,
                     args.exhaustiveness,
                     frame_path,
                     lig_path,
                     docked_lig_path
-                ))
+                )
 
