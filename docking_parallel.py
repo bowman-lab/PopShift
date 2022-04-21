@@ -107,7 +107,7 @@ for p in output_paths:
     p.mkdir(exist_ok=True, parents=True)
 
 # uses recursive glob. Must be sorted to get same order across runs.
-frame_paths = [sorted(path_receptor.rglob('*.pdbqt'))]
+frame_paths = sorted(path_receptor.rglob('*.pdbqt'))
 
 
 for run_path in output_paths:
