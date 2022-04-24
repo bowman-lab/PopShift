@@ -5,17 +5,15 @@
 ## It also aligns protein structures if needed, using user provided atoms in -a                        ##
 #########################################################################################################
 
-
-#TODO might be interesting to add the function of adding amber charges instead of only vina charges to the protein
 #* Fixed BUG by not using map: seems to convert all the ligands to a random ligand with different charges in each mol2 file - antechamber
 
 import os
 import subprocess as sp
 import sys
-import mdtraj as md
 import argparse
 import glob
 import multiprocessing as mp
+from pathlib import Path
 
 home = os.getcwd()
 
@@ -40,17 +38,8 @@ def preplig(ligand):
 
 # Converts protein pdb to pdbqt file
 def prep_receptor(receptor, out, name):
-    sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%sqt' % (out, name)])
-    return '%s/%sqt' % (out, name)
-
-# Aligns protein files using user provided atoms
-def align(protein_file,reference_file,output, atoms):
-    pdb = md.load(protein_file)
-    atoms = pdb.topology.select(atoms)
-    aligned = pdb.superpose(reference_file, atom_indices=atoms)
-    prot_name = protein_file.split('/')[-1].split('.')[0]
-    aligned.save_pdb('%s/%s_aligned.pdb' % (output,prot_name))
-    return '%s/%s_aligned.pdb' % (output, prot_name)
+    sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%s.pdbqt' % (out, name)])
+    return '%s/%s.pdbqt' % (out, name)
 
 charge_methods={
     'vina': preplig_vina,
@@ -60,31 +49,21 @@ charge_methods={
 parser = argparse.ArgumentParser()
 parser.add_argument('-p','--protein_dir',
                     help='Path to protein directory')
-parser.add_argument('-o','--output',
-                    help='Path to the output, only needed if proteins are being prepared')
 parser.add_argument('-l','--ligand_dir',
                     help='Path to ligand directory')
-parser.add_argument('-r','--reference', default='None',
-                    help='Path to reference structure to use if aligning')
-parser.add_argument('-a','--atoms', default='backbone',
-                    help='What atoms to use for aligning. Default: backbone')
 parser.add_argument('-c','--charge', default='vina',
                     choices=['antechamber', 'vina'],
                     help='What charges to add the ligand, Default: vina')
 
 args = parser.parse_args()
+if len(sys.argv) < 2:
+    parser.print_help()
+    exit(0)
 path_lig = args.ligand_dir
 path_prot = args.protein_dir
-path_output = args.output
-reference = args.reference
 
 n_procs = mp.cpu_count()
 pool = mp.Pool(processes=n_procs)
-
-try:
-    os.makedirs('%s' % path_output)
-except FileExistsError:
-    pass
 
 # Checking whether ligands need to be prepared as well, by checking if --ligands_dir flag is set
 if args.ligand_dir is not None:
@@ -103,24 +82,12 @@ else:
 
 # Aligning and converting protein pdbs to pdbqts
 if args.protein_dir is not None: #Checking whether proteins should be converted too
-    if reference != 'None':
-        print('Aligning protein to reference')
-        reference_protein = md.load(reference)
-        frames = sorted(glob.glob('%s/*pdb' % path_prot)) 
-        prot_name = [frame.split('/')[-1] for frame in frames]
-        output_list = [path_output for l in range(len(frames))]
-        reference_protein = [reference_protein for l in range(len(frames))]
-        atoms = [args.atoms for l in range(len(frames))]
-        arguments = zip(frames, reference_protein, output_list,atoms)
-        aligned = list(pool.starmap(align, arguments))
-        arguments = zip(aligned, output_list, prot_name)
-        list(pool.starmap(prep_receptor, arguments))
-    else:
-        frames = sorted(glob.glob('%s/*pdb' % path_prot))
-        prot_name = [frame.split('/')[-1] for frame in frames]
-        output_list = [path_output for l in range(len(frames))]
-        arguments = zip(frames, output_list,prot_name)
-        list(pool.starmap(prep_receptor, arguments))
+    frames = sorted(glob.glob('%s/receptor/*/*pdb' % path_prot))
+    prot_name = [Path(frame).stem for frame in frames]
+    directory = [os.path.dirname(frame) for frame in frames]
+    #output_list = ['%s/%s.pdbqt' % (directory[i],prot_name[i]) for i in range(len(directory))]
+    arguments = zip(frames, directory,prot_name)
+    list(pool.starmap(prep_receptor, arguments))
 
 pool.close()
 
