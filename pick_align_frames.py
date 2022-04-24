@@ -7,6 +7,14 @@ import loos
 from loos import pyloos
 
 
+def floatpair(s, delim=','):
+    try:
+        start_ind, end_ind = map(float, s.split(delim))
+        return start_ind, end_ind
+    except:
+        raise argparse.ArgumentTypeError('Float pairs must be specified as "decimal.one,decimal.two"')
+
+
 def get_assign_inds(assignments, nstates):
     index_list_by_bin = [[] for i in range(nstates)]
     # handle the case where there is only 1 trajectory,
@@ -34,7 +42,8 @@ def get_random_per_bin(assignments, n_states, number_desired, replace=False, gen
     return chosen_inds
 
 
-def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, replace=False, gen=np.random.default_rng()):
+def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, replace=False,
+                                        gen=np.random.default_rng()):
     all_state_indices = get_assign_inds(assignments, nstates)
     chosen_inds = (gen.choice(state_ixs, number_desired, axis=0, replace=replace)
                    for state_ixs, number_desired in zip(all_state_indices, numbers_desired))
@@ -100,6 +109,18 @@ def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs):
         pdb_path.write_text(str(pdb))  # will close file handle after writing
 
 
+def add_boonds_two_cuts(model: loos.AtomicGroup, heavy_cutoff: float, hydrogen_cutoff: float):
+    # select just the heavy atoms from the model
+    heavies = loos.selectAtoms(model, '!hydrogen')
+    # populate the bonds in the heavy-atom only file using the heavy cutoff
+    heavies.findBonds(heavy_cutoff)
+    # now populate all the bonds to hydrogen with the hydrogen cutoff.
+    model.findBonds(hydrogen_cutoff)
+    # return a new atomic group that merges the two separate groups.
+    return model.merge(heavies)
+
+
+
 frame_selectors = {
     'random': get_random_per_bin,
     'specified_totals': get_specified_number_per_bin_random,
@@ -125,7 +146,7 @@ parser.add_argument('traj_paths', type=str, nargs='+',
                          'assignments file. Alternatively, paths to the trajectory files.')
 # Optional args below here
 parser.add_argument('--assignments', type=str, default=None,
-                    help='h5 file with assignments from which MSM was built. Obligatory unless using "centers" selector.' )
+                    help='h5 file with assignments from which MSM was built. Obligatory unless using "centers" selector.')
 parser.add_argument('--subset-selection', type=str, default='all',
                     help='A loos selection string to subset all frames by (for example, if water is present it could be '
                          'stripped here).')
@@ -143,8 +164,12 @@ parser.add_argument('--make-receptor-sel-chain-A', action=argparse.BooleanOption
                     help='If thrown, make all atoms a member of chain "A" when writing PDBs.')
 parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
                     help='If thrown, write a DCD with the selected frames in each bin directory.')
-parser.add_argument('--find-bonds', type=float, default=1.65,
-                    help='If no bonds (connect records) are provided in model, then find bonds using provided distance.')
+parser.add_argument('--find-bonds', type=floatpair, default=None,
+                    help='If no bonds (CONECT records in PDB) are provided in model, find bonds using these cutoffs.')
+parser.add_argument('--clear-bonds', action=argparse.BooleanOptionalAction,
+                    help='If thrown, remove connectivity information from model. If incorrect bonds present, but bonds'
+                         ' are needed, use this in conjunction with "--find-bonds" to first clear old bonds then assign'
+                         ' new ones.')
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -158,9 +183,18 @@ if __name__ == '__main__':
     else:
         assignments = ra.load(args.assignments)
     model = loos.createSystem(args.model)
+    # check to see if it was requested that we remove bond information
+    # (if it's foouling up parsing, by prep script, for example)
+    if args.clear_bonds:
+        model.clearBonds()
+    # Assign bonds using cutoffs here.
     if not model.hasBonds():
-        print('Bond specifiers not found in model file. Defining bonds using', args.find_bonds, 'angstrom cut-off.')
-        model.findBonds(args.find_bonds)
+        print('Bond specifiers not found in model file.')
+        if args.find_bonds:
+            print('Defining bonds using distance cutoffs; ', args.find_bonds[0], 'angstrom for heavy atoms, and ',
+                  args.find_binds[1], 'angstroms for hydrogens.')
+            model = add_boonds_two_cuts(model, *args.find_bonds)
+    # AutoDock usually needs this to produce working parameterizations.
     if args.make_receptor_sel_chain_A:
         for atom in model:
             atom.chainId('A')
@@ -219,5 +253,3 @@ if __name__ == '__main__':
     )
     align_samples(subset_vec, align_vec)
     write_sampled_frames(subset_vec, full_inds, out_path, args.write_bin_trajs)
-
-
