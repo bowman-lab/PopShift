@@ -192,7 +192,7 @@ if __name__ == '__main__':
         print('Bond specifiers not found in model file.')
         if args.find_bonds:
             print('Defining bonds using distance cutoffs; ', args.find_bonds[0], 'angstrom for heavy atoms, and ',
-                  args.find_binds[1], 'angstroms for hydrogens.')
+                  args.find_bonds[1], 'angstroms for hydrogens.')
             model = add_boonds_two_cuts(model, *args.find_bonds)
     # AutoDock usually needs this to produce working parameterizations.
     if args.make_receptor_sel_chain_A:
