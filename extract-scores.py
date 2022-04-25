@@ -5,6 +5,7 @@ import argparse
 import re
 from pathlib import Path
 
+
 def extract_score_from_vina_pdbqt(pdbqts: list, search_re=re.compile(r'^REMARK VINA RESULT')):
     outlist = []
     for pdbqt in pdbqts:
@@ -13,7 +14,7 @@ def extract_score_from_vina_pdbqt(pdbqts: list, search_re=re.compile(r'^REMARK V
                 if search_re.match(line):
                     outlist.append(float(line.split(maxsplit=4)[3]))
                     break
-    return np.array(outlist)
+    return np.array(outlist, dtype='f4')
 
 
 extract_methods = {
@@ -40,6 +41,7 @@ for dock_run in args.docking_runs:
         state_paths = sorted(sorted(sample_path for sample_path in state_path.iterdir())
                              for state_path in ligand_path.iterdir())
         r = ra.RaggedArray(pool.map(em, state_paths))
+        print(r._data.dtype)
         ra.save(str(out_path/ligand_path.stem)+'.h5', r)
 
 pool.close()
