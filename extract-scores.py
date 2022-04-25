@@ -33,8 +33,8 @@ pool = mp.Pool(args.nprocs)
 em = extract_methods[args.result_type]
 for dock_run in args.docking_runs:
     dock_path = Path(dock_run)
-    out_path = dock_path.parent/'extracted_scores'
-    out_path.mkdir(exist_ok=True)
+    out_path = dock_path.parent/'extracted_scores'/dock_path.name
+    out_path.mkdir(exist_ok=True, parents=True)
     for ligand_path in dock_path.iterdir():
         state_paths = sorted(sorted(sample_path for sample_path in state_path.iterdir())
                              for state_path in ligand_path.iterdir())
