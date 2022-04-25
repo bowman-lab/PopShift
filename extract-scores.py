@@ -39,6 +39,6 @@ for dock_run in args.docking_runs:
         state_paths = sorted(sorted(sample_path for sample_path in state_path.iterdir())
                              for state_path in ligand_path.iterdir())
         r = ra.RaggedArray(pool.map(em, state_paths))
-        ra.save(r, str(out_path/ligand_path.stem)+'.h5')
+        ra.save(str(out_path/ligand_path.stem)+'.h5', r)
 
 pool.close()
