@@ -4,16 +4,20 @@ import argparse
 import re
 from pathlib import Path
 
-def extract_score_from_vina_pdbqt(pdbqt: Path, search_re=re.compile(r'^REMARK VINA RESULT')):
-    with pdbqt.open() as f:
-        for line in f:
-            if search_re.match(line):
-               return float(line.split(maxsplit=4)[3])
+def extract_score_from_vina_pdbqt(pdbqts: list, search_re=re.compile(r'^REMARK VINA RESULT')):
+    outlist = []
+    for pdbqt in pdbqts:
+        with pdbqt.open() as f:
+            for line in f:
+                if search_re.match(line):
+                    outlist.append(float(line.split(maxsplit=4)[3]))
+                    break
+    return outlist
 
 
 extract_methods = {
     'vina': extract_score_from_vina_pdbqt,
-    'smina': None
+    'smina': None  # add this later. should be easy.
 }
 
 parser = argparse.ArgumentParser()
@@ -29,9 +33,12 @@ pool = mp.Pool(args.nprocs)
 em = extract_methods[args.result_type]
 for dock_run in args.docking_runs:
     dock_path = Path(dock_run)
+    out_path = dock_path.parent/'extracted_scores'
+    out_path.mkdir(exist_ok=True)
     for ligand_path in dock_path.iterdir():
-        state_paths = sorted(state_path for state_path in ligand_path.iterdir())
-        r = ra.RaggedArray(pool.starmap(em, state_paths))
-        r.save(
+        state_paths = sorted(sorted(sample_path for sample_path in state_path.iterdir())
+                             for state_path in ligand_path.iterdir())
+        r = ra.RaggedArray(pool.map(em, state_paths))
+        ra.save(r, str(out_path/ligand_path.stem)+'.h5')
 
 pool.close()
