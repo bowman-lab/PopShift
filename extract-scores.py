@@ -1,4 +1,5 @@
 from enspara import ra
+import numpy as np
 import multiprocessing as mp
 import argparse
 import re
@@ -12,7 +13,7 @@ def extract_score_from_vina_pdbqt(pdbqts: list, search_re=re.compile(r'^REMARK V
                 if search_re.match(line):
                     outlist.append(float(line.split(maxsplit=4)[3]))
                     break
-    return outlist
+    return np.array(outlist)
 
 
 extract_methods = {
