@@ -21,7 +21,7 @@ extract_methods = {
 }
 
 parser = argparse.ArgumentParser()
-parser.add_argument('docking-runs', nargs='+',
+parser.add_argument('docking_runs', nargs='+',
                     help='Path(s) to docked ligand directories, containing PDBQTs.')
 parser.add_argument('--nprocs','-n', type=int, default=1,
                     help='number of processors to use for multiprocessing module.')
