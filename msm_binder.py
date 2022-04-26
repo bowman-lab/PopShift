@@ -135,11 +135,12 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_pre
     kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
     if reweighted_eq_prefix:
         # convert trimmmed Free energies to association constants
+        outpre = reweighted_eq_prefix + '/'+tag
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
         reweights = reweighted_frames(frame_weights, kas)
         fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
-        ra.save(reweighted_eq_prefix+tag+'-fe.h5', ra.RaggedArray(fe_per_state, lengths=lengths))
-        ra.save(reweighted_eq_prefix+tag+'-eq_probs.h5', ra.RaggedArray(reweights, lengths=lengths))
+        ra.save(outpre+'-fe.h5', ra.RaggedArray(fe_per_state, lengths=lengths))
+        ra.save(outpre+'-eq_probs.h5', ra.RaggedArray(reweights, lengths=lengths))
     weighted = weighted_avg(frame_weights, trimmed_fes)
     simple = simple_avg(trimmed_fes)
     return {
