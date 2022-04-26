@@ -1,4 +1,6 @@
 import numpy as np
+import multiprocessing as mp
+from functools import partial
 from enspara import ra
 from enspara import msm
 from pathlib import Path
@@ -51,7 +53,6 @@ def process_indexed_fe_file(indexed_fe_filename, assignments, active_states, eq_
     # scale eqch frame weight by the number of counts in each state
     frame_weights = (eq_probs[mapping] / state_counts)[trimmed_filtered_assigns]
     return frame_weights, trimmed_fes
-
 
 
 # Determine weighting for each frame
@@ -127,7 +128,7 @@ def simple_avg(trimmed_binding_fes):
     return np.mean(trimmed_binding_fes)
 
 
-def calx_store(binding_output, trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix):
+def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix):
     msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
     kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
     if reweighted_eq_prefix:
@@ -139,12 +140,28 @@ def calx_store(binding_output, trimmed_fes, frame_weights, rt, tag, kd_scale, re
         np.save(reweighted_eq_prefix+tag+'-eq_probs.npy', reweights)
     weighted = weighted_avg(frame_weights, trimmed_fes)
     simple = simple_avg(trimmed_fes)
-    binding_output[tag] = {
+    return {
         'msm dG': msm_binding,
         'msm K_D': kd,
         'weighted avg': weighted,
         'simple avg': simple
     }
+
+
+def interp_trj_samples_worker_index_from_file(rt, assignments, active_states, eq_probs, mapping, stride, kd_scale,
+                                              reweighted_eq_prefix, binding_run):
+    tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
+    frame_weights, trimmed_fes = process_indexed_fe_file(binding_run, assignments,
+                                                         active_states, eq_probs, mapping, stride=stride)
+    return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix)
+
+
+def interp_trj_samples_worker_strided_inds(rt, active_states, stride, assignments, frame_weights, kd_scale,
+                                           reweighted_eq_prefix, binding_run):
+    tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
+    fes = ra.RaggedArray(np.load(binding_run, allow_pickle=True))
+    trimmed_fes = filter_trim_binding_fes(fes, active_states, stride, assignments)
+    return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix)
 
 
 def interp_trj_samples(args, rt, binding_output):
@@ -175,16 +192,19 @@ def interp_trj_samples(args, rt, binding_output):
             [msm_obj.mapping_.to_mapped[k] for k in msm_obj.mapping_.to_mapped.keys()],
             dtype=np.int32
         )[active_states]
-    for binding_run in args.binding_fes:
-        tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
-        if args.index_from_file:
+    if args.index_from_file:
+        for binding_run in args.binding_fes:
+            tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
             frame_weights, trimmed_fes = process_indexed_fe_file(binding_run, assignments,
                                                                  active_states, msm_obj.eq_probs_, mapping, stride=args.stride)
-        else:
+            binding_output[tag] = calx_output(trimmed_fes, frame_weights, rt, tag, args.K_D_scale,
+                                              args.reweighted_eq_prefix)
+    else:
+        for binding_run in args.binding_fes:
+            tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
             fes = ra.RaggedArray(np.load(binding_run, allow_pickle=True))
             trimmed_fes = filter_trim_binding_fes(fes, active_states, args.stride, assignments)
-
-        calx_store(binding_output, trimmed_fes, frame_weights, rt, tag, args.K_D_scale, args.reweighted_eq_prefix)
+            binding_output[tag] = calx_output(trimmed_fes, frame_weights, rt, tag, args.K_D_scale, args.reweighted_eq_prefix)
 
 
 
@@ -195,7 +215,7 @@ def interp_bin_samples(args, rt, binding_output):
         fes = ra.load(binding_run)
         tag = Path(binding_run).stem
         sample_weights = expand_bin_weights(eq_probs, fes.lengths)
-        calx_store(binding_output, fes, sample_weights, rt, tag, args.K_D_scale, args.reweighted_eq_prefix)
+        calx_output(binding_output, fes, sample_weights, rt, tag, args.K_D_scale, args.reweighted_eq_prefix)
 
 
 
@@ -211,6 +231,8 @@ def run_cli(raw_args=None):
                                        'or samples from each bin in an MSM.')
 
     # supra parser optional args
+    parser.add_argument('--nprocs', '-n', type=int, default=1,
+                        help='Number of multiprocessing processes to distribute binding fes to. ')
     parser.add_argument('--append-to', type=str, default=None,
                         help='If the name of a JSON is provided, will append results to that object. '
                              'By default, writes a new one from scratch.')
