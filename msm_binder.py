@@ -72,7 +72,8 @@ def filter_frame_weights(msm_obj, stride, state_counts, ra_assigns, active_state
 # returns RaggedArray of eq_prob per bin divided by number of samples drawn from that bin.
 def expand_bin_weights(eq_probs, lengths):
     return ra.RaggedArray(
-        [np.array([p for p in repeat(eq_probs[i]/length)]) for i, length in enumerate(lengths)]
+        [[p for p in repeat(eq_probs[i]/length, length)]
+         for i, length in enumerate(lengths)]
     )
 
 
@@ -110,6 +111,7 @@ def free_energy_per_state(frame_weights, reweights, rt):
 def kd_from_kcal_mol(fe, rt):
     return np.exp(fe / rt)
 
+
 def kcal_mol_from_kd(kd, rt):
     return np.log(kd * rt)
 
@@ -128,7 +130,7 @@ def simple_avg(trimmed_binding_fes):
     return np.mean(trimmed_binding_fes)
 
 
-def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix):
+def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix, lengths=None):
     msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
     kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
     if reweighted_eq_prefix:
@@ -136,15 +138,15 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_pre
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
         reweights = reweighted_frames(frame_weights, kas)
         fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
-        np.save(reweighted_eq_prefix+tag+'-fe.npy', fe_per_state)
-        np.save(reweighted_eq_prefix+tag+'-eq_probs.npy', reweights)
+        ra.save(reweighted_eq_prefix+tag+'-fe.h5', ra.RaggedArray(fe_per_state, lengths=lengths))
+        ra.save(reweighted_eq_prefix+tag+'-eq_probs.h5', ra.RaggedArray(reweights, lengths=lengths))
     weighted = weighted_avg(frame_weights, trimmed_fes)
     simple = simple_avg(trimmed_fes)
     return {
-        'msm dG': msm_binding,
-        'msm K_D': kd,
-        'weighted avg': weighted,
-        'simple avg': simple
+        'msm dG': float(msm_binding),
+        'msm K_D': float(kd),
+        'weighted avg': float(weighted),
+        'simple avg': float(simple)
     }
 
 
@@ -207,9 +209,10 @@ def interp_trj_samples(args, rt):
 
 def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq_prefix, binding_run):
     fes = ra.load(binding_run)
+    lengths = fes.lengths
     tag = Path(binding_run).stem
-    sample_weights = expand_bin_weights(eq_probs, fes.lengths)
-    return tag, calx_output(fes, sample_weights, rt, tag, kd_scale, reweighted_eq_prefix)
+    sample_weights = expand_bin_weights(eq_probs, lengths)
+    return tag, calx_output(fes.flatten(), sample_weights.flatten(), rt, tag, kd_scale, reweighted_eq_prefix, lengths=lengths)
 
 
 def interp_bin_samples(args, rt):
@@ -227,8 +230,9 @@ def run_cli(raw_args=None):
     T = 310.0  # Kelvin
     unit_scale = 0.001  # by default convert free energy to kilo-energy units.
 
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(help='Select mode of input. Either samples from trajectories, '
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    subparsers = parser.add_subparsers(dest='subparser_name',
+                                       help='Select mode of input. Either samples from trajectories, '
                                        'or samples from each bin in an MSM.')
 
     # supra parser optional args
@@ -257,7 +261,6 @@ def run_cli(raw_args=None):
     trj_parser = subparsers.add_parser('traj-samples', help='Use a sequence of docked frames. '
                                                             'Use assigns and MSM to map these scores to MSM bins '
                                                             '(and therefore equilibrium probabilities).')
-    trj_parser.set_defaults(func=interp_trj_samples)
     # required positional arg for traj reading
     trj_parser.add_argument('msm', type=str,
                             help='Name of MSM object (mapping expected) to use in calculation.')
@@ -274,17 +277,22 @@ def run_cli(raw_args=None):
     trj_parser.add_argument('--index-from-file', action=argparse.BooleanOptionalAction,
                             help='If thrown, interprets binding_fes file(s) as list of RA indexes, '
                             'with the last element containing the binding FE/score. Stride is applied to frames still.')
+    trj_parser.set_defaults(func=interp_trj_samples)
 
     bin_parser = subparsers.add_parser('bin-samples')
-    bin_parser.set_defaults(func=interp_bin_samples)
     bin_parser.add_argument('eq_probs', type=lambda x: np.load(x),
                             help='Path to numpy array of equilibrium probabilities in 1-1 correspondence to the states '
                                  'in each FE ragged array.')
     bin_parser.add_argument('binding_fes_h5s', nargs='+',
                             help='File name(s) of extracted binding scores. Should be ragged arrays of lengths '
                                  'msm_bins, samples_from_bin.')
+    bin_parser.set_defaults(func=interp_bin_samples)
 
     args = parser.parse_args(raw_args)
+    if not args.subparser_name:
+        print('Error: a command is obligatory. See commands in braces in usage statement.')
+        parser.print_usage()
+        exit(1)
 
     rt = args.gas_constant * args.temperature * args.unit_scale
     outfn = args.out  # Note, this defaults to none.
@@ -316,4 +324,9 @@ def run_cli(raw_args=None):
 
 
 if __name__ == '__main__':
-    run_cli(raw_args=argv[1:])
+    test_input = """
+    -n 3 -o /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox/calx.json --reweighted-eq-prefix /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox bin-samples /home/louis/bowmore/louiss/binding/tem/tem1-beta-lactamase/msm/populations.npy /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox/333101.h5 /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox/334779.h5 /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox/336328.h5
+    """.split()
+    run_cli(raw_args=test_input)
+    # run_cli(raw_args=argv[1:])
+    
