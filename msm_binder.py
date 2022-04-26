@@ -184,39 +184,40 @@ def interp_trj_samples(args, rt, binding_output):
         msm_obj = msm.MSM.load(args.msm)
     # subset of states that were not trimmed
     active_states = get_active_states(msm_obj)
-    if not args.index_from_file:
-        state_counts = count_strided_states(assignments, args.stride, active_states)
-        frame_weights = filter_frame_weights(msm_obj, args.stride, state_counts, assignments, active_states)
-    else:
+    # ready a mp pool for distributing binding run work.
+    pool = mp.Pool(args.nprocs)
+
+    if args.index_from_file:
         mapping = np.array(
             [msm_obj.mapping_.to_mapped[k] for k in msm_obj.mapping_.to_mapped.keys()],
             dtype=np.int32
         )[active_states]
-    if args.index_from_file:
-        for binding_run in args.binding_fes:
-            tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
-            frame_weights, trimmed_fes = process_indexed_fe_file(binding_run, assignments,
-                                                                 active_states, msm_obj.eq_probs_, mapping, stride=args.stride)
-            binding_output[tag] = calx_output(trimmed_fes, frame_weights, rt, tag, args.K_D_scale,
-                                              args.reweighted_eq_prefix)
+        br_op = partial(interp_trj_samples_worker_index_from_file, rt, assignments, active_states, msm_obj.eq_probs_,
+                        mapping, args.stride, args.K_D_scale, args.reweighted_eq_prefix)
     else:
-        for binding_run in args.binding_fes:
-            tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
-            fes = ra.RaggedArray(np.load(binding_run, allow_pickle=True))
-            trimmed_fes = filter_trim_binding_fes(fes, active_states, args.stride, assignments)
-            binding_output[tag] = calx_output(trimmed_fes, frame_weights, rt, tag, args.K_D_scale, args.reweighted_eq_prefix)
+        state_counts = count_strided_states(assignments, args.stride, active_states)
+        frame_weights = filter_frame_weights(msm_obj, args.stride, state_counts, assignments, active_states)
+        br_op = partial(interp_trj_samples_worker_strided_inds, rt, active_states, args.stride, assignments,
+                        frame_weights, args.K_D_scale, args.reweighted_eq_prefix)
+
+    packed_results = pool.map(br_op, args.binding_fes)
+    pool.close()
+    return packed_results
 
 
+def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq_prefix, binding_run):
+    fes = ra.load(binding_run)
+    tag = Path(binding_run).stem
+    sample_weights = expand_bin_weights(eq_probs, fes.lengths)
+    return tag, calx_output(fes, sample_weights, rt, tag, kd_scale, reweighted_eq_prefix)
 
 
 def interp_bin_samples(args, rt, binding_output):
-    eq_probs = args.eq_probs
-    for binding_run in args.bindingFE_h5s:
-        fes = ra.load(binding_run)
-        tag = Path(binding_run).stem
-        sample_weights = expand_bin_weights(eq_probs, fes.lengths)
-        calx_output(binding_output, fes, sample_weights, rt, tag, args.K_D_scale, args.reweighted_eq_prefix)
-
+    pool = mp.Pool(args.nprocs)
+    br_op = partial(interp_bin_samples_worker, rt, args.eq_probs, args.K_D_scale, args.reweighted_eq_prefix)
+    packed_results = pool.map(br_op, args.binding_fes_h5s)
+    pool.close()
+    return packed_results
 
 
 
@@ -279,7 +280,7 @@ def run_cli(raw_args=None):
     bin_parser.add_argument('eq_probs', type=lambda x: np.load(x),
                             help='Path to numpy array of equilibrium probabilities in 1-1 correspondence to the states '
                                  'in each FE ragged array.')
-    bin_parser.add_argument('bindingFE_h5s', nargs='+',
+    bin_parser.add_argument('binding_fes_h5s', nargs='+',
                             help='File name(s) of extracted binding scores. Should be ragged arrays of lengths '
                                  'msm_bins, samples_from_bin.')
 
@@ -300,7 +301,9 @@ def run_cli(raw_args=None):
         binding_output['command line'] = []
         binding_output['command line'].append(argv)
 
-    args.func(args, rt, binding_output)
+    packed_results = args.func(args, rt, binding_output)
+    for tag, result in packed_results:
+        binding_output[tag] = result
 
     binding_output['log'] = {}
     binding_output['log']['rt'] = rt
