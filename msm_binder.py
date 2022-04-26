@@ -65,12 +65,13 @@ def filter_frame_weights(msm_obj, stride, state_counts, ra_assigns, active_state
          ]
     )
 
+
 # determine weights for each sample-set taken from a given bin
 # takes an array of bin weights and an array of lengths (as from RaggedArray.lengths)
 # returns RaggedArray of eq_prob per bin divided by number of samples drawn from that bin.
 def expand_bin_weights(eq_probs, lengths):
     return ra.RaggedArray(
-        [np.array([p for p in repeat(eq_probs[i]/length)]) for i, length in lengths]
+        [np.array([p for p in repeat(eq_probs[i]/length)]) for i, length in enumerate(lengths)]
     )
 
 
@@ -208,8 +209,6 @@ def run_cli(raw_args=None):
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(help='Select mode of input. Either samples from trajectories, '
                                        'or samples from each bin in an MSM.')
-    parser.add_argument('msm', type=str,
-                        help='Name of MSM object (mapping expected) to use in calculation.')
 
     # supra parser optional args
     parser.add_argument('--append-to', type=str, default=None,
@@ -237,6 +236,8 @@ def run_cli(raw_args=None):
                                                             '(and therefore equilibrium probabilities).')
     trj_parser.set_defaults(func=interp_trj_samples)
     # required positional arg for traj reading
+    trj_parser.add_argument('msm', type=str,
+                            help='Name of MSM object (mapping expected) to use in calculation.')
     trj_parser.add_argument('assignments', type=str,
                             help='Name of discretized trajectory.')
     # optional args to control traj reading
