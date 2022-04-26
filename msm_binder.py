@@ -324,9 +324,5 @@ def run_cli(raw_args=None):
 
 
 if __name__ == '__main__':
-    test_input = """
-    -n 3 -o /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox/calx.json --reweighted-eq-prefix /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox bin-samples /home/louis/bowmore/louiss/binding/tem/tem1-beta-lactamase/msm/populations.npy /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox/333101.h5 /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox/334779.h5 /home/louis/bowmore/louiss/binding/tem/wt-knoverek-21-centers/extracted_scores/bigbox/336328.h5
-    """.split()
-    run_cli(raw_args=test_input)
-    # run_cli(raw_args=argv[1:])
+    run_cli(raw_args=argv[1:])
     
