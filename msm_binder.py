@@ -116,7 +116,7 @@ def simple_avg(trimmed_binding_fes):
     return np.mean(trimmed_binding_fes)
 
 
-def calx_collate(binding_output, trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix):
+def calx_store(binding_output, trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix):
     msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
     kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
     if reweighted_eq_prefix:
@@ -173,30 +173,14 @@ def interp_trj_samples(args, rt, binding_output):
             fes = ra.RaggedArray(np.load(binding_run, allow_pickle=True))
             trimmed_fes = filter_trim_binding_fes(fes, active_states, args.stride, assignments)
 
-        
-        msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
-        kd = kd_from_kcal_mol(msm_binding, rt) * args.K_D_scale  # kd, scaled by user-supplied conversion.
-        if args.reweighted_eq_prefix:
-            # convert trimmmed Free energies to association constants
-            kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
-            reweights = reweighted_frames(frame_weights, kas)
-            fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
-            np.save(args.reweighted_eq_prefix+tag+'-fe.npy', fe_per_state)
-            np.save(args.reweighted_eq_prefix+tag+'-eq_probs.npy', reweights)
-        weighted = weighted_avg(frame_weights, trimmed_fes)
-        simple = simple_avg(trimmed_fes)
-        binding_output[tag] = {
-            'msm dG': msm_binding,
-            'msm K_D': kd,
-            'weighted avg': weighted,
-            'simple avg': simple
-        }
+        calx_store(binding_output, trimmed_fes, frame_weights, rt, tag, args.K_D_scale, args.reweighted_eq_prefix)
 
-    binding_output['log'] = {}
-    binding_output['log']['rt'] = rt
+
 
 
 def interp_bin_samples(args, rt, binding_output):
+    for binding_run in args.bindingFE_h5s:
+        fes = ra.load(binding_run)
 
 
 def run_cli(raw_args=None):
@@ -278,6 +262,9 @@ def run_cli(raw_args=None):
         binding_output['command line'].append(argv)
 
     args.func(args, rt, binding_output)
+
+    binding_output['log'] = {}
+    binding_output['log']['rt'] = rt
 
     if outfn:
         with open(outfn, 'w') as f:
