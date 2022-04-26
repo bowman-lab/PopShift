@@ -164,7 +164,7 @@ def interp_trj_samples_worker_strided_inds(rt, active_states, stride, assignment
     return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix)
 
 
-def interp_trj_samples(args, rt, binding_output):
+def interp_trj_samples(args, rt):
     if args.emma_dtraj:  # note this import here allows the tool to not strictly depend on PyEMMA.
         from pyemma import coordinates as coor
         assignments = coor.load(args.assignments)
@@ -212,7 +212,7 @@ def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq_prefix, bind
     return tag, calx_output(fes, sample_weights, rt, tag, kd_scale, reweighted_eq_prefix)
 
 
-def interp_bin_samples(args, rt, binding_output):
+def interp_bin_samples(args, rt):
     pool = mp.Pool(args.nprocs)
     br_op = partial(interp_bin_samples_worker, rt, args.eq_probs, args.K_D_scale, args.reweighted_eq_prefix)
     packed_results = pool.map(br_op, args.binding_fes_h5s)
@@ -301,7 +301,7 @@ def run_cli(raw_args=None):
         binding_output['command line'] = []
         binding_output['command line'].append(argv)
 
-    packed_results = args.func(args, rt, binding_output)
+    packed_results = args.func(args, rt)
     for tag, result in packed_results:
         binding_output[tag] = result
 
