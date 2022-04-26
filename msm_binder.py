@@ -5,6 +5,7 @@ from pathlib import Path
 import json
 # import stdout to dump json, import argv to save command line
 from sys import stdout, argv
+from itertools import repeat
 # import pyemma.coordinates as coor  # note this is done below only in the case where it's needed.
 
 import argparse
@@ -64,6 +65,14 @@ def filter_frame_weights(msm_obj, stride, state_counts, ra_assigns, active_state
          ]
     )
 
+# determine weights for each sample-set taken from a given bin
+# takes an array of bin weights and an array of lengths (as from RaggedArray.lengths)
+# returns RaggedArray of eq_prob per bin divided by number of samples drawn from that bin.
+def expand_bin_weights(eq_probs, lengths):
+    return ra.RaggedArray(
+        [np.array([p for p in repeat(eq_probs[i]/length)]) for i, length in lengths]
+    )
+
 
 # takes a ragged array of scores, a ragged array of
 def filter_trim_binding_fes(binding_fes, active_states, stride, ra_assigns):
@@ -105,7 +114,8 @@ def kcal_mol_from_kd(kd, rt):
 
 # reductions below here
 def msm_binding_dG(frame_weights, trimmed_binding_fes, rt):
-    return - rt * np.log(np.sum(frame_weights * np.exp(-trimmed_binding_fes / rt)))
+    rtn = -rt
+    return rtn * np.log(np.sum(frame_weights * np.exp(trimmed_binding_fes / rtn)))
 
 
 def weighted_avg(frame_weights, trimmed_binding_fes):
@@ -179,8 +189,14 @@ def interp_trj_samples(args, rt, binding_output):
 
 
 def interp_bin_samples(args, rt, binding_output):
+    eq_probs = args.eq_probs
     for binding_run in args.bindingFE_h5s:
         fes = ra.load(binding_run)
+        tag = Path(binding_run).stem
+        sample_weights = expand_bin_weights(eq_probs, fes.lengths)
+        calx_store(binding_output, fes, sample_weights, rt, tag, args.K_D_scale, args.reweighted_eq_prefix)
+
+
 
 
 def run_cli(raw_args=None):
