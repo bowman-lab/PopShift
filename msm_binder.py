@@ -102,79 +102,41 @@ def kd_from_kcal_mol(fe, rt):
 def kcal_mol_from_kd(kd, rt):
     return np.log(kd * rt)
 
+
 # reductions below here
 def msm_binding_dG(frame_weights, trimmed_binding_fes, rt):
     return - rt * np.log(np.sum(frame_weights * np.exp(-trimmed_binding_fes / rt)))
 
 
-
-# note, this expression produces a formula that is not in the right units
-def weighted_avg(frame_weights, trimmed_binding_fes, rt):
-    return np.sum(frame_weights * np.exp(-trimmed_binding_fes / rt))
+def weighted_avg(frame_weights, trimmed_binding_fes):
+    return np.average(trimmed_binding_fes, weights=frame_weights)
 
 
-# note, this expression produces a formula that is not in the right units
-def simple_avg(trimmed_binding_fes, rt):
-    return np.mean(np.exp(-trimmed_binding_fes / rt))
+def simple_avg(trimmed_binding_fes):
+    return np.mean(trimmed_binding_fes)
 
 
-def run_cli(raw_args=None):
-    # relevant constants
-    R = 1.98720425864083  # cal*k^-1mol^-1, wikipedia table
-    T = 310.0  # Kelvin
-    unit_scale = 0.001  # by default convert free energy to kilo-energy units.
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('assignments', type=str,
-                        help='Name of discretized trajectory.')
-    parser.add_argument('msm', type=str,
-                        help='Name of MSM object (mapping expected) to use in calculation.')
-    parser.add_argument('binding_fes', type=str, nargs="+",
-                        help='Name of binding FE file for some compound. Expects .npy by default.')
-    parser.add_argument('--append-to', type=str, default=None,
-                        help='If the name of a JSON is provided, will append results to that object. '
-                             'By default, writes a new one from scratch.')
-    parser.add_argument('--out', '-o', type=str, default=None,
-                        help='If name is provided, overwrite to it. Otherwise write to stdout. Superceded by "--apend-to".')
-    parser.add_argument('--index-from-file', action=argparse.BooleanOptionalAction,
-                        help='If thrown, interprets binding_fes file(s) as list of RA indexes, '
-                             'with the last element containing the binding FE/score. Stride is applied to frames still.')
-    parser.add_argument('--emma-dtraj', '-e', action=argparse.BooleanOptionalAction,
-                        help='If thrown, read discretized trajectory as a PyEMMA dtraj.')
-    parser.add_argument('--stride','-s', type=int, default=1,
-                        help='Stride-rate through dtrajs. Applied uniformly to frames. If using indexed score input,'
-                             'and indices match those of dtrajs (i.e. striding has already been applied), set to 1.')
-    parser.add_argument('--gas-constant', '-R', type=float, default=R,
-                        help="The ideal gas constant. Choose to match units of T.")
-    parser.add_argument('--temperature', '-T', type=float, default=T,
-                        help='The temperature to estimate free energy at. Choose to match units of R.')
-    parser.add_argument('--unit-scale', type=float, default=unit_scale,
-                        help='Scale output free energy by this value. '
-                             'Default scales to kilo-energy units (4ex kcals/mol).')
-    parser.add_argument('--K_D-scale', type=float, default=10**6,
-                        help='Scale dissoc. constant by this value to put entry in more customary range. '
-                             'Default converts to micromolar.')
-    parser.add_argument('--reweighted-eq-prefix', '-w', type=str, default=None,
-                        help='Prefix for filename to write reweighted equilibrium probabilities '
-                             'for each state to. Output will be in numpy binary format')
+def calx_collate(binding_output, trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix):
+    msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
+    kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
+    if reweighted_eq_prefix:
+        # convert trimmmed Free energies to association constants
+        kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
+        reweights = reweighted_frames(frame_weights, kas)
+        fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
+        np.save(reweighted_eq_prefix+tag+'-fe.npy', fe_per_state)
+        np.save(reweighted_eq_prefix+tag+'-eq_probs.npy', reweights)
+    weighted = weighted_avg(frame_weights, trimmed_fes)
+    simple = simple_avg(trimmed_fes)
+    binding_output[tag] = {
+        'msm dG': msm_binding,
+        'msm K_D': kd,
+        'weighted avg': weighted,
+        'simple avg': simple
+    }
 
 
-    args = parser.parse_args(raw_args)
-
-    rt = args.gas_constant * args.temperature * args.unit_scale
-    outfn = args.out  # Note, this defaults to none.
-    if args.append_to:
-        with open(args.append_to) as f:
-            binding_output = json.load(f)
-        outfn = args.append_to
-    else:
-        binding_output = {}
-
-    try:
-        binding_output['command line'].append(argv)
-    except KeyError:
-        binding_output['command line'] = []
-        binding_output['command line'].append(argv)
+def interp_trj_samples(args, rt, binding_output):
     if args.emma_dtraj:  # note this import here allows the tool to not strictly depend on PyEMMA.
         from pyemma import coordinates as coor
         assignments = coor.load(args.assignments)
@@ -186,7 +148,7 @@ def run_cli(raw_args=None):
         assignments = ra.load(args.assignments)
 
     # this may need to be redone to be more compatible with PyEMMA or other builders.
-    # in princple all that's needed is an eq-probs array and a mapping array that works like enspara's.
+    # in principle all that's needed is an eq-probs array and a mapping array that works like enspara's.
     # check to see if they've fed us some weird pickled MSM
     if '.npy' in args.msm:
         msm_obj = np.load(args.msm, allow_pickle=True).item()
@@ -210,6 +172,8 @@ def run_cli(raw_args=None):
         else:
             fes = ra.RaggedArray(np.load(binding_run, allow_pickle=True))
             trimmed_fes = filter_trim_binding_fes(fes, active_states, args.stride, assignments)
+
+        
         msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
         kd = kd_from_kcal_mol(msm_binding, rt) * args.K_D_scale  # kd, scaled by user-supplied conversion.
         if args.reweighted_eq_prefix:
@@ -219,8 +183,8 @@ def run_cli(raw_args=None):
             fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
             np.save(args.reweighted_eq_prefix+tag+'-fe.npy', fe_per_state)
             np.save(args.reweighted_eq_prefix+tag+'-eq_probs.npy', reweights)
-        weighted = weighted_avg(frame_weights, trimmed_fes, rt)
-        simple = simple_avg(trimmed_fes, rt)
+        weighted = weighted_avg(frame_weights, trimmed_fes)
+        simple = simple_avg(trimmed_fes)
         binding_output[tag] = {
             'msm dG': msm_binding,
             'msm K_D': kd,
@@ -230,6 +194,90 @@ def run_cli(raw_args=None):
 
     binding_output['log'] = {}
     binding_output['log']['rt'] = rt
+
+
+def interp_bin_samples(args, rt, binding_output):
+
+
+def run_cli(raw_args=None):
+    # relevant constants
+    R = 1.98720425864083  # cal*k^-1mol^-1, wikipedia table
+    T = 310.0  # Kelvin
+    unit_scale = 0.001  # by default convert free energy to kilo-energy units.
+
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(help='Select mode of input. Either samples from trajectories, '
+                                       'or samples from each bin in an MSM.')
+    parser.add_argument('msm', type=str,
+                        help='Name of MSM object (mapping expected) to use in calculation.')
+
+    # supra parser optional args
+    parser.add_argument('--append-to', type=str, default=None,
+                        help='If the name of a JSON is provided, will append results to that object. '
+                             'By default, writes a new one from scratch.')
+    parser.add_argument('--out', '-o', type=str, default=None,
+                        help='If name is provided, overwrite to it. Otherwise write to stdout. '
+                             'Superceded by "--apend-to".')
+    parser.add_argument('--gas-constant', '-R', type=float, default=R,
+                        help="The ideal gas constant. Choose to match units of T.")
+    parser.add_argument('--temperature', '-T', type=float, default=T,
+                        help='The temperature to estimate free energy at. Choose to match units of R.')
+    parser.add_argument('--unit-scale', type=float, default=unit_scale,
+                        help='Scale output free energy by this value. '
+                             'Default scales to kilo-energy units (4ex kcals/mol).')
+    parser.add_argument('--K_D-scale', type=float, default=10 ** 6,
+                        help='Scale dissoc. constant by this value to put entry in more customary range. '
+                             'Default converts to micromolar.')
+    parser.add_argument('--reweighted-eq-prefix', '-w', type=str, default=None,
+                        help='Prefix for filename to write reweighted equilibrium probabilities '
+                             'for each state to. Output will be in numpy binary format')
+
+    trj_parser = subparsers.add_parser('traj-samples', help='Use a sequence of docked frames. '
+                                                            'Use assigns and MSM to map these scores to MSM bins '
+                                                            '(and therefore equilibrium probabilities).')
+    trj_parser.set_defaults(func=interp_trj_samples)
+    # required positional arg for traj reading
+    trj_parser.add_argument('assignments', type=str,
+                            help='Name of discretized trajectory.')
+    # optional args to control traj reading
+    trj_parser.add_argument('--emma-dtraj', '-e', action=argparse.BooleanOptionalAction,
+                            help='If thrown, read discretized trajectory as a PyEMMA dtraj.')
+    trj_parser.add_argument('binding_fes', type=str, nargs="+",
+                            help='Name of binding FE file for some compound. Expects .npy by default.')
+    trj_parser.add_argument('--stride', '-s', type=int, default=1,
+                            help='Stride-rate through dtrajs. Applied uniformly to frames. If using indexed score '
+                                 'input, and indices match those of dtrajs (already strided), set to 1.')
+    trj_parser.add_argument('--index-from-file', action=argparse.BooleanOptionalAction,
+                            help='If thrown, interprets binding_fes file(s) as list of RA indexes, '
+                            'with the last element containing the binding FE/score. Stride is applied to frames still.')
+
+    bin_parser = subparsers.add_parser('bin-samples')
+    bin_parser.set_defaults(func=interp_bin_samples)
+    bin_parser.add_argument('eq_probs', type=lambda x: np.load(x),
+                            help='Path to numpy array of equilibrium probabilities in 1-1 correspondence to the states '
+                                 'in each FE ragged array.')
+    bin_parser.add_argument('bindingFE_h5s', nargs='+',
+                            help='File name(s) of extracted binding scores. Should be ragged arrays of lengths '
+                                 'msm_bins, samples_from_bin.')
+
+    args = parser.parse_args(raw_args)
+
+    rt = args.gas_constant * args.temperature * args.unit_scale
+    outfn = args.out  # Note, this defaults to none.
+    if args.append_to:
+        with open(args.append_to) as f:
+            binding_output = json.load(f)
+        outfn = args.append_to
+    else:
+        binding_output = {}
+
+    try:
+        binding_output['command line'].append(argv)
+    except KeyError:
+        binding_output['command line'] = []
+        binding_output['command line'].append(argv)
+
+    args.func(args, rt, binding_output)
 
     if outfn:
         with open(outfn, 'w') as f:
