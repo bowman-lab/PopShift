@@ -135,6 +135,8 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_pre
     kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
     if reweighted_eq_prefix:
         # convert trimmmed Free energies to association constants
+        if not reweighted_eq_prefix.isdir():
+            reweighted_eq_prefix.mkdir()
         outpre = reweighted_eq_prefix + '/'+tag
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
         reweights = reweighted_frames(frame_weights, kas)
