@@ -310,12 +310,12 @@ def run_cli(raw_args=None):
         binding_output['command line'] = []
         binding_output['command line'].append(argv)
 
+    binding_output['log'] = {}
+    binding_output['log']['rt'] = rt
+
     packed_results = args.func(args, rt)
     for tag, result in packed_results:
         binding_output[tag] = result
-
-    binding_output['log'] = {}
-    binding_output['log']['rt'] = rt
 
     if outfn:
         with open(outfn, 'w') as f:
