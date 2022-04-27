@@ -130,19 +130,17 @@ def simple_avg(trimmed_binding_fes):
     return np.mean(trimmed_binding_fes)
 
 
-def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix, lengths=None):
+def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath, lengths=None):
     msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
     kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
-    if reweighted_eq_prefix:
-        # convert trimmmed Free energies to association constants
-        if not reweighted_eq_prefix.isdir():
-            reweighted_eq_prefix.mkdir()
-        outpre = reweighted_eq_prefix + '/'+tag
+    if reweighted_eq:
+        # convert trimmed Free energies to association constants
+        outpre = outpath / tag
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
         reweights = reweighted_frames(frame_weights, kas)
         fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
-        ra.save(outpre+'-fe.h5', ra.RaggedArray(fe_per_state, lengths=lengths))
-        ra.save(outpre+'-eq_probs.h5', ra.RaggedArray(reweights, lengths=lengths))
+        ra.save(str(outpre.with_suffix('-fe.h5')), ra.RaggedArray(fe_per_state, lengths=lengths))
+        ra.save(str(outpre.with_suffix('-eq_probs.h5')), ra.RaggedArray(reweights, lengths=lengths))
     weighted = weighted_avg(frame_weights, trimmed_fes)
     simple = simple_avg(trimmed_fes)
     return {
@@ -154,19 +152,19 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_pre
 
 
 def interp_trj_samples_worker_index_from_file(rt, assignments, active_states, eq_probs, mapping, stride, kd_scale,
-                                              reweighted_eq_prefix, binding_run):
+                                              reweighted_eq, outpath, binding_run):
     tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
     frame_weights, trimmed_fes = process_indexed_fe_file(binding_run, assignments,
                                                          active_states, eq_probs, mapping, stride=stride)
-    return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix)
+    return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath)
 
 
 def interp_trj_samples_worker_strided_inds(rt, active_states, stride, assignments, frame_weights, kd_scale,
-                                           reweighted_eq_prefix, binding_run):
+                                           reweighted_eq, outpath, binding_run):
     tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
     fes = ra.RaggedArray(np.load(binding_run, allow_pickle=True))
     trimmed_fes = filter_trim_binding_fes(fes, active_states, stride, assignments)
-    return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq_prefix)
+    return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath)
 
 
 def interp_trj_samples(args, rt):
@@ -203,24 +201,26 @@ def interp_trj_samples(args, rt):
         state_counts = count_strided_states(assignments, args.stride, active_states)
         frame_weights = filter_frame_weights(msm_obj, args.stride, state_counts, assignments, active_states)
         br_op = partial(interp_trj_samples_worker_strided_inds, rt, active_states, args.stride, assignments,
-                        frame_weights, args.K_D_scale, args.reweighted_eq_prefix)
+                        frame_weights, args.K_D_scale, args.reweighted_eq, args.out)
 
     packed_results = pool.map(br_op, args.binding_fes)
     pool.close()
     return packed_results
 
 
-def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq_prefix, binding_run):
+def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq, outpath, binding_run):
     fes = ra.load(binding_run)
     lengths = fes.lengths
-    tag = Path(binding_run).stem
+    br_path = Path(binding_run)
+    tag = br_path.stem
     sample_weights = expand_bin_weights(eq_probs, lengths)
-    return tag, calx_output(fes.flatten(), sample_weights.flatten(), rt, tag, kd_scale, reweighted_eq_prefix, lengths=lengths)
+    return tag, calx_output(fes.flatten(), sample_weights.flatten(), rt, tag, kd_scale, reweighted_eq,
+                            outpath, lengths=lengths)
 
 
 def interp_bin_samples(args, rt):
     pool = mp.Pool(args.nprocs)
-    br_op = partial(interp_bin_samples_worker, rt, args.eq_probs, args.K_D_scale, args.reweighted_eq_prefix)
+    br_op = partial(interp_bin_samples_worker, rt, args.eq_probs, args.K_D_scale, args.reweighted_eq, args.out)
     packed_results = pool.map(br_op, args.binding_fes_h5s)
     pool.close()
     return packed_results
@@ -237,15 +237,17 @@ def run_cli(raw_args=None):
     subparsers = parser.add_subparsers(dest='subparser_name',
                                        help='Select mode of input. Either samples from trajectories, '
                                        'or samples from each bin in an MSM.')
-
+    # supra parser positional args
+    parser.add_argument('out_dir', type=Path,
+                        help='Name of directory to write all outfiles within.')
     # supra parser optional args
     parser.add_argument('--nprocs', '-n', type=int, default=1,
                         help='Number of multiprocessing processes to distribute binding fes to. ')
     parser.add_argument('--append-to', type=str, default=None,
                         help='If the name of a JSON is provided, will append results to that object. '
                              'By default, writes a new one from scratch.')
-    parser.add_argument('--out', '-o', type=str, default=None,
-                        help='If name is provided, overwrite to it. Otherwise write to stdout. '
+    parser.add_argument('--binding-out', type=str, default='calx.json',
+                        help='Write calculation results to json here.'
                              'Superceded by "--apend-to".')
     parser.add_argument('--gas-constant', '-R', type=float, default=R,
                         help="The ideal gas constant. Choose to match units of T.")
@@ -257,9 +259,8 @@ def run_cli(raw_args=None):
     parser.add_argument('--K_D-scale', type=float, default=10 ** 6,
                         help='Scale dissoc. constant by this value to put entry in more customary range. '
                              'Default converts to micromolar.')
-    parser.add_argument('--reweighted-eq-prefix', '-w', type=str, default=None,
-                        help='Prefix for filename to write reweighted equilibrium probabilities '
-                             'for each state to. Output will be in numpy binary format')
+    parser.add_argument('--reweighted-eq', action=argparse.BooleanOptionalAction, default=True,
+                        help='If thrown, computes and writes reweighted equilibrium probabilities in out-dir.')
 
     trj_parser = subparsers.add_parser('traj-samples', help='Use a sequence of docked frames. '
                                                             'Use assigns and MSM to map these scores to MSM bins '
@@ -298,11 +299,11 @@ def run_cli(raw_args=None):
         exit(1)
 
     rt = args.gas_constant * args.temperature * args.unit_scale
-    outfn = args.out  # Note, this defaults to none.
+    out_binding_path = args.out / args.binding_out
     if args.append_to:
         with open(args.append_to) as f:
             binding_output = json.load(f)
-        outfn = args.append_to
+        out_binding_path = args.append_to
     else:
         binding_output = {}
 
@@ -319,8 +320,8 @@ def run_cli(raw_args=None):
     for tag, result in packed_results:
         binding_output[tag] = result
 
-    if outfn:
-        with open(outfn, 'w') as f:
+    if out_binding_path:
+        with open(out_binding_path, 'w') as f:
             json.dump(binding_output, f, indent=4)
     else:
         json.dump(binding_output, stdout, indent=4)
