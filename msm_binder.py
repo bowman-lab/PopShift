@@ -237,10 +237,10 @@ def run_cli(raw_args=None):
     subparsers = parser.add_subparsers(dest='subparser_name',
                                        help='Select mode of input. Either samples from trajectories, '
                                        'or samples from each bin in an MSM.')
-    # supra parser positional args
-    parser.add_argument('out_dir', type=Path,
-                        help='Name of directory to write all outfiles within.')
     # supra parser optional args
+    parser.add_argument('--out', type=Path, default=Path('binding-calx'),
+                        help='Name of directory to write all outfiles within. Defaults to parent of '
+                             'first provided binding fe file.')
     parser.add_argument('--nprocs', '-n', type=int, default=1,
                         help='Number of multiprocessing processes to distribute binding fes to. ')
     parser.add_argument('--append-to', type=str, default=None,
@@ -303,7 +303,6 @@ def run_cli(raw_args=None):
     if args.append_to:
         with open(args.append_to) as f:
             binding_output = json.load(f)
-        out_binding_path = args.append_to
     else:
         binding_output = {}
 
