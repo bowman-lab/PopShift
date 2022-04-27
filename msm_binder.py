@@ -297,6 +297,8 @@ def run_cli(raw_args=None):
         exit(1)
 
     rt = args.gas_constant * args.temperature * args.unit_scale
+    if not args.out.is_dir():
+        args.out.mkdir()
     out_binding_path = args.out / args.binding_out
     if args.append_to:
         with open(args.append_to) as f:
