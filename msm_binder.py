@@ -135,12 +135,11 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, ou
     kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
     if reweighted_eq:
         # convert trimmed Free energies to association constants
-        outpre = outpath / tag
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
         reweights = reweighted_frames(frame_weights, kas)
         fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
-        ra.save(str(outpre.with_suffix('-fe.h5')), ra.RaggedArray(fe_per_state, lengths=lengths))
-        ra.save(str(outpre.with_suffix('-eq_probs.h5')), ra.RaggedArray(reweights, lengths=lengths))
+        ra.save(str(outpath/(tag+'-fe.h5')), ra.RaggedArray(fe_per_state, lengths=lengths))
+        ra.save(str(outpath/(tag+'-eq_probs.h5')), ra.RaggedArray(reweights, lengths=lengths))
     weighted = weighted_avg(frame_weights, trimmed_fes)
     simple = simple_avg(trimmed_fes)
     return {
@@ -247,8 +246,7 @@ def run_cli(raw_args=None):
                         help='If the name of a JSON is provided, will append results to that object. '
                              'By default, writes a new one from scratch.')
     parser.add_argument('--binding-out', type=str, default='calx.json',
-                        help='Write calculation results to json here.'
-                             'Superceded by "--apend-to".')
+                        help='Write calculation results to json here. Overwrites file if exists.')
     parser.add_argument('--gas-constant', '-R', type=float, default=R,
                         help="The ideal gas constant. Choose to match units of T.")
     parser.add_argument('--temperature', '-T', type=float, default=T,
@@ -319,11 +317,8 @@ def run_cli(raw_args=None):
     for tag, result in packed_results:
         binding_output[tag] = result
 
-    if out_binding_path:
-        with open(out_binding_path, 'w') as f:
-            json.dump(binding_output, f, indent=4)
-    else:
-        json.dump(binding_output, stdout, indent=4)
+    with open(out_binding_path, 'w') as f:
+        json.dump(binding_output, f, indent=4)
 
 
 if __name__ == '__main__':
