@@ -120,7 +120,6 @@ def add_boonds_two_cuts(model: loos.AtomicGroup, heavy_cutoff: float, hydrogen_c
     return model.merge(heavies)
 
 
-
 frame_selectors = {
     'random': get_random_per_bin,
     'specified_totals': get_specified_number_per_bin_random,
@@ -145,31 +144,36 @@ parser.add_argument('traj_paths', type=str, nargs='+',
                     help='A file containing a list of trajectories corresponding (in matching order) to the supplied '
                          'assignments file. Alternatively, paths to the trajectory files.')
 # Optional args below here
-parser.add_argument('--assignments', type=str, default=None,
-                    help='h5 file with assignments from which MSM was built. Obligatory unless using "centers" selector.')
-parser.add_argument('--subset-selection', type=str, default='all',
-                    help='A loos selection string to subset all frames by (for example, if water is present it could be '
-                         'stripped here).')
-
-parser.add_argument('--number-frames', default=10, type=int,
-                    help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
-                         'an error is thrown.')
-parser.add_argument('--total-per-bin', default=None, type=str,
-                    help='Text file with totals to draw from each MSM bin. Should be one column of totals, '
-                         'where the row index corresponds to the bin and the entry is the number of frames to draw.')
 parser.add_argument('--align-resid-list', type=str, default=None,
                     help='If provided, use numbers in file as a list of residue IDs. Concatenate align selection string '
                          'with one selecting these resids.')
-parser.add_argument('--make-receptor-sel-chain-A', action=argparse.BooleanOptionalAction,
-                    help='If thrown, make all atoms a member of chain "A" when writing PDBs.')
-parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
-                    help='If thrown, write a DCD with the selected frames in each bin directory.')
-parser.add_argument('--find-bonds', type=floatpair, default=None,
-                    help='If no bonds (CONECT records in PDB) are provided in model, find bonds using these cutoffs.')
+parser.add_argument('--assignments', type=str, default=None,
+                    help='h5 file with assignments from which MSM was built. Obligatory unless using "centers" selector.')
 parser.add_argument('--clear-bonds', action=argparse.BooleanOptionalAction,
                     help='If thrown, remove connectivity information from model. If incorrect bonds present, but bonds'
                          ' are needed, use this in conjunction with "--find-bonds" to first clear old bonds then assign'
                          ' new ones.')
+parser.add_argument('--find-bonds', type=floatpair, default=None,
+                    help='If no bonds (CONECT records in PDB) are provided in model, find bonds using these cutoffs.')
+parser.add_argument('--make-receptor-sel-chain-A', action=argparse.BooleanOptionalAction, default=True,
+                    help='If thrown, make all atoms a member of chain "A" when writing PDBs.')
+parser.add_argument('--mapping', '-m', type=Path, default=None,
+                    help='Use a supplied path to a mapping or MSM to handle eq_probs that have been reduced '
+                         'relative to the number of clusters in assignments (4x, with ergodic trimming). If not'
+                         ' supplying an enspara MSM, mapping should be a json of the enspara mapping object or '
+                         'a 1D numpy array with the same number of elements as the number of clusters, where '
+                         'each element is the mapped cluster index.')
+parser.add_argument('--number-frames', default=10, type=int,
+                    help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
+                         'an error is thrown.')
+parser.add_argument('--subset-selection', type=str, default='all',
+                    help='A loos selection string to subset all frames by (for example, if water is present it could be '
+                         'stripped here).')
+parser.add_argument('--total-per-bin', default=None, type=str,
+                    help='Text file with totals to draw from each MSM bin. Should be one column of totals, '
+                         'where the row index corresponds to the bin and the entry is the number of frames to draw.')
+parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
+                    help='If thrown, write a DCD with the selected frames in each bin directory.')
 
 if __name__ == '__main__':
     args = parser.parse_args()
