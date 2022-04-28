@@ -216,6 +216,8 @@ parser.add_argument('--total-per-bin', default=None, type=str,
                          'where the row index corresponds to the bin and the entry is the number of frames to draw.')
 parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
                     help='If thrown, write a DCD with the selected frames in each bin directory.')
+parser.add_argument('--write-bin-dtraj', type=Path, default=None,
+                    help='Write an enspara RaggedArray with each frame index selected to provided path.')
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -310,3 +312,5 @@ if __name__ == '__main__':
     )
     align_samples(subset_vec, align_vec)
     write_sampled_frames(subset_vec, full_inds, out_path, args.write_bin_trajs)
+    if args.write_bin_dtraj:
+        ra.save(args.write_bin_dtraj, chosen_frames)
