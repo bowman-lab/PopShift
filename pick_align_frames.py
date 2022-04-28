@@ -43,7 +43,7 @@ def get_assigns_map_no_unbox(assignments, nstates, mapping):
             try:
                 bin_index = mapping[cluster_index]
                 index_list_by_bin[bin_index].append((traj_index, frame_index))
-            except ValueError:
+            except KeyError:
                 pass
     return index_list_by_bin
 
@@ -56,7 +56,7 @@ def get_assigns_map_unbox(assignments, nstates, mapping):
             try:
                 bin_index = mapping[cluster_index[0]]
                 index_list_by_bin[bin_index].append((traj_index, frame_index))
-            except ValueError:
+            except KeyError:
                 pass
     return index_list_by_bin
 
