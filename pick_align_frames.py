@@ -66,14 +66,14 @@ def get_assign_inds(assignments, nstates, mapping=None):
     # meaning the ragged array doesn't have singleton elements at the tightest level.
     if assignments.shape[0] == 1:
         if mapping:
-            index_list_by_bin = get_assigns_map_no_unbox(assignments, nstates, mapping)
-        else:
-            index_list_by_bin = get_assigns_no_map_no_unbox(assignments, nstates)
-    else:  # operate on a normal 2-ragged array.
-        if mapping:
             index_list_by_bin = get_assigns_map_unbox(assignments, nstates, mapping)
         else:
             index_list_by_bin = get_assigns_no_map_unbox(assignments, nstates)
+    else:  # operate on a normal 2-ragged array.
+        if mapping:
+            index_list_by_bin = get_assigns_map_no_unbox(assignments, nstates, mapping)
+        else:
+            index_list_by_bin = get_assigns_no_map_no_unbox(assignments, nstates)
     return [np.array(bin_indices, dtype=[('traj', np.int32), ('frame', np.int32)]) for bin_indices in index_list_by_bin]
 
 
