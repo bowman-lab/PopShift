@@ -288,6 +288,7 @@ def run_cli(raw_args=None):
     bin_parser.add_argument('binding_fes_h5s', nargs='+',
                             help='File name(s) of extracted binding scores. Should be ragged arrays of lengths '
                                  'msm_bins, samples_from_bin.')
+
     bin_parser.set_defaults(func=interp_bin_samples)
 
     args = parser.parse_args(raw_args)
