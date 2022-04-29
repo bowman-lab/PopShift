@@ -253,7 +253,7 @@ if __name__ == '__main__':
 
     # if filename is provided read its contents to obtain align string
     try:
-        align_sel += Path(args.align_selection).read_text()
+        align_sel += " && ("+Path(args.align_selection).read_text()+")"
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
         align_sel += args.align_selection
 
