@@ -248,7 +248,7 @@ if __name__ == '__main__':
             atom.chainId('A')
     align_sel = ''
     if args.align_resid_list:
-        alresids = np.genfromtxt(args.align_resid_list)
+        alresids = np.genfromtxt(args.align_resid_list, dtype=int)
         align_sel += ' || '.join(['resid == {}'.format(i) for i in alresids])
 
     # if filename is provided read its contents to obtain align string
