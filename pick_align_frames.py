@@ -255,7 +255,7 @@ if __name__ == '__main__':
     try:
         align_sel += " && ("+Path(args.align_selection).read_text()+")"
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
-        align_sel += args.align_selection
+        align_sel += " && ("+args.align_selection+")"
 
     # get frame counts, however it's prescribed
     if args.total_per_bin:
