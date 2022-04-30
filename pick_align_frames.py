@@ -175,11 +175,11 @@ parser.add_argument('receptor_name', type=str,
 parser.add_argument('model', type=str,
                     help='A loos-interpretable model file that will permit reading the trajectories in "traj_paths".')
 
+parser.add_argument(metavar='eq_probs|pickled_msm', type=str, dest='eq_probs',
+                    help='.npy file with equilibrium probabilities from MSM, or pickled MSM object.')
 parser.add_argument('frame_selector', type=str,
                     choices=frame_selectors.keys(),
                     help='Strategy for selecting frames to represent each MSM bin.')
-parser.add_argument(metavar='eq_probs|pickled_msm', type=str, dest='eq_probs',
-                    help='.npy file with equilibrium probabilities from MSM, or pickled MSM object.')
 parser.add_argument('align_selection', type=str,
                     help='A file containing a loos selection string to align the selected frames with. Alternatively '
                          'provide a selection string on the command line.')
