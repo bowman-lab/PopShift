@@ -6,6 +6,7 @@ from enspara.util.load import concatenate_trjs
 import loos
 from loos import pyloos
 import json
+from sys import argv
 
 
 def floatpair(s, delim=','):
@@ -174,7 +175,6 @@ parser.add_argument('receptor_name', type=str,
                     help="Name to use to use as top-level directory for the docking run tree.")
 parser.add_argument('model', type=str,
                     help='A loos-interpretable model file that will permit reading the trajectories in "traj_paths".')
-
 parser.add_argument(metavar='eq_probs|pickled_msm', type=str, dest='eq_probs',
                     help='.npy file with equilibrium probabilities from MSM, or pickled MSM object.')
 parser.add_argument('frame_selector', type=str,
@@ -220,6 +220,8 @@ parser.add_argument('--write-bin-dtraj', type=Path, default=None,
                     help='Write an enspara RaggedArray with each frame index selected to provided path.')
 
 if __name__ == '__main__':
+    for i, arg in enumerate(argv):
+        print(i, arg)
     args = parser.parse_args()
     try:
         eq_probs = np.load(args.eq_probs)
