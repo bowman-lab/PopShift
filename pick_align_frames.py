@@ -263,6 +263,7 @@ if __name__ == '__main__':
     if args.total_per_bin:
         frame_counts = np.loadtxt(args.total_per_bin, dtype=int)
 
+    mapping = None
     elif args.assignments:
         low_inds = np.where(
             np.bincount(assignments.flatten()) < args.number_frames)
@@ -282,8 +283,6 @@ if __name__ == '__main__':
                 print(args.mapping, 'does not have an extension that implies it is either a pickled msm or a mapping '
                                     'object (.json or .numpy). Unsupported format. Exiting.')
                 exit(2)
-        else:
-            mapping = None
         frame_counts = args.number_frames
     else:
         frame_counts = 1
