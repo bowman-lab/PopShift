@@ -260,10 +260,10 @@ if __name__ == '__main__':
         align_sel += " && ("+args.align_selection+")"
 
     # get frame counts, however it's prescribed
+    mapping = None
     if args.total_per_bin:
         frame_counts = np.loadtxt(args.total_per_bin, dtype=int)
 
-    mapping = None
     elif args.assignments:
         low_inds = np.where(
             np.bincount(assignments.flatten()) < args.number_frames)
