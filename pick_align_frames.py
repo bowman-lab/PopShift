@@ -107,7 +107,7 @@ def unpickle_resave_centers(centersfn):
 
 
 def rip_conformations(chosen_inds, model, subset_selection, align_selection, traj_paths):
-    trajectories = [pyloos.Trajectory(traj_path, model, subset=subset_selection) for traj_path in traj_paths]
+    trajectories = [pyloos.Trajectory(str(traj_path), model, subset=subset_selection) for traj_path in traj_paths]
     full_inds = []
     subset_vec = loos.AtomicGroupVector()
     align_vec = loos.AtomicGroupVector()
@@ -251,13 +251,13 @@ if __name__ == '__main__':
     align_sel = ''
     if args.align_resid_list:
         alresids = np.genfromtxt(args.align_resid_list).astype(int)
-        align_sel += ' || '.join(['resid == {}'.format(i) for i in alresids])
+        align_sel += ' || '.join(['resid == {}'.format(i) for i in alresids]) + " &&"
 
     # if filename is provided read its contents to obtain align string
     try:
-        align_sel += " && ("+Path(args.align_selection).read_text()+")"
+        align_sel += " ("+Path(args.align_selection).read_text()+")"
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
-        align_sel += " && ("+args.align_selection+")"
+        align_sel += " ("+args.align_selection+")"
 
     # get frame counts, however it's prescribed
     mapping = None
