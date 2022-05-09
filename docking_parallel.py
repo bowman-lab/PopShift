@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 def coordreader(s, delim=','):
+    s = s.replace('\\', '')
     try:
         x, y, z = map(float, s.split(delim))
         return x, y, z
@@ -54,7 +55,7 @@ docking_methods = {
 }
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('receptor_dir',
                     help='Path to protein directory')
@@ -62,7 +63,7 @@ parser.add_argument('out_dir',
                     help='Path to the output. By convention, the name of the docking run including info like box size '
                          'if multiple are being tested.')
 parser.add_argument('box_center', type=coordreader,
-                    help='Comma delimited string listing x,y,z of box center')
+                    help='Comma delimited string listing x,y,z of box center. If x is negative start with backslash ("\-5,5,3")')
 parser.add_argument('box_size', type=coordreader,
                     help='Comma delimited string listing lx,ly,lz as the lengths of the x, y and z box-sides.')
 parser.add_argument('ligand_list', nargs="+",
