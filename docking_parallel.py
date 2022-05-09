@@ -55,7 +55,7 @@ docking_methods = {
 }
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('receptor_dir',
                     help='Path to protein directory')
