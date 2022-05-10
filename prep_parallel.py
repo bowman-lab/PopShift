@@ -14,14 +14,18 @@ import argparse
 import glob
 import multiprocessing as mp
 from pathlib import Path
+from functools import partial
 
 home = os.getcwd()
 
 #executables = '/project/bowmanlab/bnovak/ADFRsuite_x86_64Linux_1.0/bin' # Path to ADFR suite where prep scripts are #*Put scripts in your path instead
 
 # Adds vina charges to a ligand
-def preplig_vina(ligand):
-    sp.run(['prepare_ligand', '-l', ligand,])
+def preplig_vina(ligand, a_flag=None):
+    if a_flag:
+        sp.run(['prepare_ligand', '-l', ligand, '-A', a_flag])
+    else:
+        sp.run(['prepare_ligand', '-l', ligand])
     return print("Ligand has been converted to pdbqt file with vina charges")
 
 # Adds antechamber charges to the ligand pdb
@@ -31,14 +35,20 @@ def add_charges(ligand):
     return '%s.mol2' % name
 
 # Converts to pdbqt using user provided charges
-def preplig(ligand):
+def preplig(ligand, a_flag=None):
     os.chdir(path_lig)
-    sp.run(['prepare_ligand', '-l', ligand, '-C'])
+    if a_flag:
+        sp.run(['prepare_ligand', '-l', ligand, '-C', '-A', a_flag])
+    else:
+        sp.run(['prepare_ligand', '-l', ligand, '-C'])
     return print("Ligand has been converted to pdbqt file using provided charges")
 
 # Converts protein pdb to pdbqt file
-def prep_receptor(receptor, out, name):
-    sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%s.pdbqt' % (out, name),'-A','bonds_hydrogens'])
+def prep_receptor(receptor, out, name, a_flag=None):
+    if a_flag:
+        sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%s.pdbqt' % (out, name), '-A', a_flag])
+    else:
+        sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%s.pdbqt' % (out, name)])
     return '%s/%s.pdbqt' % (out, name)
 
 charge_methods={
@@ -46,14 +56,19 @@ charge_methods={
     'antechamber': add_charges
 }
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-p','--protein_dir',
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('-p', '--protein_dir',
                     help='Path to protein directory')
-parser.add_argument('-l','--ligand_dir',
+parser.add_argument('-l', '--ligand_dir',
                     help='Path to ligand directory')
-parser.add_argument('-c','--charge', default='vina',
+parser.add_argument('-c', '--charge', default='vina',
                     choices=['antechamber', 'vina'],
-                    help='What charges to add the ligand, Default: vina')
+                    help='What charges to add the ligand.')
+parser.add_argument('-A', '--a-flag', default=None, type=str,
+                    help='If provided, pass this flag (types of repairs to make) to calls to prep receptor/ligand. '
+                         'Same options as the "A" flag for prepare_receptor and prepare_ligand. Bond-finding in this '
+                         'way is extremely slow for larger receptors.')
+
 
 args = parser.parse_args()
 if len(sys.argv) < 2:
@@ -71,7 +86,7 @@ if args.ligand_dir is not None:
     print('Adding charges to the ligand')
     ligands = sorted(glob.glob('*pdb')) #TODO change so that either mol2 or a pdb can be input; might not be necessary
     for ligand in ligands:
-        charge_methods[args.charge](ligand)
+        charge_methods[args.charge](ligand, a_flag=args.a_flag)
     os.chdir(home)
     #charged_ligands = list(pool.map(charge_methods[args.charge], ligands)) #! Currently not using map, because it makes all the ligands have the same atoms with different charges for yet unknown reason
     if args.charge == 'antechamber':
@@ -80,14 +95,15 @@ if args.ligand_dir is not None:
 else:
     print('Assuming ligands have been already converted to pdbqts with partial charges')
 
-# Aligning and converting protein pdbs to pdbqts
+# Converting protein pdbs to pdbqts
 if args.protein_dir is not None: #Checking whether proteins should be converted too
     frames = sorted(glob.glob('%s/receptor/*/*pdb' % path_prot))
     prot_name = [Path(frame).stem for frame in frames]
     directory = [os.path.dirname(frame) for frame in frames]
+    prep = partial(prep_receptor, a_flag=args.a_flag)
     #output_list = ['%s/%s.pdbqt' % (directory[i],prot_name[i]) for i in range(len(directory))]
-    arguments = zip(frames, directory,prot_name)
-    list(pool.starmap(prep_receptor, arguments))
+    arguments = zip(frames, directory, prot_name)
+    list(pool.starmap(prep, arguments))
 
 pool.close()
 
