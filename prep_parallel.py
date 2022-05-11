@@ -93,7 +93,7 @@ if args.ligand_dir is not None:
         charged_ligands = sorted(glob.glob(f'{path_lig}/*mol2'))
         list(pool.map(preplig,charged_ligands))
 else:
-    print('Assuming ligands have been already converted to pdbqts with partial charges')
+    print('Assuming ligands have partial charges assigned')
 
 # Converting protein pdbs to pdbqts
 if args.protein_dir is not None: #Checking whether proteins should be converted too
