@@ -46,9 +46,9 @@ def preplig(ligand, a_flag=None):
 # Converts protein pdb to pdbqt file
 def prep_receptor(receptor, out, name, a_flag=None):
     if a_flag:
-        sp.run([f'prepare_receptor', '-r', receptor, '-o', '{out}/{name}.pdbqt', '-A', a_flag])
+        sp.run(['prepare_receptor', '-r', receptor, '-o', f'{out}/{name}.pdbqt', '-A', a_flag])
     else:
-        sp.run([f'prepare_receptor', '-r', receptor, '-o', '{out}/{name}.pdbqt'])
+        sp.run(['prepare_receptor', '-r', receptor, '-o', f'{out}/{name}.pdbqt'])
     return f'{out}/{name}.pdbqt'
 
 charge_methods={
