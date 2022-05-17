@@ -123,13 +123,12 @@ def find_closest_frame(cluster_centers,features,indices):
     return all_indices
 
 def get_frames_using_kmeans(assignments, nstates,features,n_clusters,mapping):
-    print('we are here')
+    print('Mapping features to bins')
     mapped_features,all_state_indices = map_features(assignments, nstates, mapping,features)
-    print('features mapped')
+    print('Clustering frames within bins using features provided')
     cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)]
-    print('kmeans done')
+    print('Looking for frames closest to each kmeans center')
     indices_to_extract = find_closest_frame(cluster_centers,mapped_features,all_state_indices)
-    print('found closest frame to kmeans centers')
     indices_to_extract = [np.concatenate(i) for i in indices_to_extract]
     return indices_to_extract
 
