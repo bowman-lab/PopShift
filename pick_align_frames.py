@@ -89,7 +89,6 @@ def get_random_per_bin(assignments, n_states, number_desired, mapping, replace=F
 def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, mapping, replace=False,
                                         gen=np.random.default_rng()):
     all_state_indices = get_assign_inds(assignments, nstates, mapping)
-    print(all_state_indices)
     chosen_inds = (gen.choice(state_ixs, number_desired, axis=0, replace=replace)
                    for state_ixs, number_desired in zip(all_state_indices, numbers_desired))
     return list(chosen_inds)
@@ -116,7 +115,7 @@ def find_closest_frame(cluster_centers,features,indices):
     all_indices = []
     for num,bin in enumerate(cluster_centers):
         distances = [calc_euclidean_distance(i,features[num]) for i in bin]
-        min_distance = [np.min(i) for i in distances]
+        min_distance = [np.min(i) for i in distances] #! Not sure if i want/need this, might be interesting to print out
         min_distance_loc = [np.where(i==np.min(i)) for i in distances]
         frames_to_extract = [indices[num][min_distance_loc[i][0]] for i in range(len(min_distance_loc))]
         all_indices.append(frames_to_extract)
@@ -126,7 +125,7 @@ def get_frames_using_kmeans(assignments, nstates,features,n_clusters,mapping):
     print('Mapping features to bins')
     mapped_features,all_state_indices = map_features(assignments, nstates, mapping,features)
     print('Clustering frames within bins using features provided')
-    cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)]
+    cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)] #! This line seems slow for some reason
     print('Looking for frames closest to each kmeans center')
     indices_to_extract = find_closest_frame(cluster_centers,mapped_features,all_state_indices)
     indices_to_extract = [np.concatenate(i) for i in indices_to_extract]
@@ -333,9 +332,7 @@ if __name__ == '__main__':
             exit(2)
 
     if args.features:
-        print('starting to choose frames')
         features = ra.load(f'{args.features}')
-        print('loaded in features')
         chosen_frames = frame_selectors[args.frame_selector](
         assignments,
         eq_probs.shape[0],
