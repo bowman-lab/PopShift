@@ -126,6 +126,7 @@ def find_frames_to_extract(assignments, nstates, mapping,features,n_clusters):
     mapped_features,all_state_indices = map_features(assignments, nstates, mapping,features)
     cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)]
     indices_to_extract = find_closest_frame(cluster_centers,mapped_features,all_state_indices)
+    indices_to_extract = [np.concatenate(i) for i in indices_to_extract]
     return indices_to_extract
 
 # def get_specified_number_per_bin_random_features(assignments, nstates, numbers_desired, mapping, replace=False,
