@@ -122,20 +122,17 @@ def find_closest_frame(cluster_centers,features,indices):
         all_indices.append(frames_to_extract)
     return all_indices
 
-def find_frames_to_extract(assignments, nstates, mapping,features,n_clusters):
+def get_frames_using_kmeans(assignments, nstates,features,n_clusters,mapping):
+    print('we are here')
     mapped_features,all_state_indices = map_features(assignments, nstates, mapping,features)
+    print('features mapped')
     cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)]
+    print('kmeans done')
     indices_to_extract = find_closest_frame(cluster_centers,mapped_features,all_state_indices)
+    print('found closest frame to kmeans centers')
     indices_to_extract = [np.concatenate(i) for i in indices_to_extract]
     return indices_to_extract
 
-# def get_specified_number_per_bin_random_features(assignments, nstates, numbers_desired, mapping, replace=False,
-#                                         gen=np.random.default_rng()):
-#     all_state_indices = get_assign_inds(assignments, nstates, mapping)
-    
-#     chosen_inds = (gen.choice(state_ixs, number_desired, axis=0, replace=replace)
-#                    for state_ixs, number_desired in zip(all_state_indices, numbers_desired))
-#     return list(chosen_inds)
 
 def get_centers(assigs, nstates, nd, mapping):
     return np.array([[0, i] for i in range(nstates)]).reshape(nstates, 1, 2)
@@ -210,7 +207,8 @@ def add_boonds_two_cuts(model: loos.AtomicGroup, heavy_cutoff: float, hydrogen_c
 frame_selectors = {
     'random': get_random_per_bin,
     'specified_totals': get_specified_number_per_bin_random,
-    'centers': get_centers
+    'centers': get_centers,
+    'kmeans': get_frames_using_kmeans
 }
 
 parser = argparse.ArgumentParser()
@@ -261,6 +259,8 @@ parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
                     help='If thrown, write a DCD with the selected frames in each bin directory.')
 parser.add_argument('--write-bin-dtraj', type=Path, default=None,
                     help='Write an enspara RaggedArray with each frame index selected to provided path.')
+parser.add_argument('--features', type=Path, default=None,
+                    help='Supply a path to features that were used for clustering. This will then be used to pick sufficiently different frames from the bin by using kmeans clustering within a bin')
 
 if __name__ == '__main__':
     for i, arg in enumerate(argv):
@@ -333,12 +333,24 @@ if __name__ == '__main__':
                                 'object (.json or .numpy). Unsupported format. Exiting.')
             exit(2)
 
-    chosen_frames = frame_selectors[args.frame_selector](
+    if args.features:
+        print('starting to choose frames')
+        features = ra.load(f'{args.features}')
+        print('loaded in features')
+        chosen_frames = frame_selectors[args.frame_selector](
+        assignments,
+        eq_probs.shape[0],
+        features,
+        frame_counts,
+        mapping
+        )
+    else:
+        chosen_frames = frame_selectors[args.frame_selector](
         assignments,
         eq_probs.shape[0],
         frame_counts,
         mapping
-    )
+        )
 
     if len(args.traj_paths) == 1:
         traj_paths = []
