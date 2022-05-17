@@ -17,10 +17,6 @@ def floatpair(s, delim=','):
     except:
         raise argparse.ArgumentTypeError('Float pairs must be specified as "decimal.one,decimal.two"')
 
-def calc_euclidean_distance(reference,other_frames_in_the_bin):
-    distances = [euclidean(reference,other_frames_in_the_bin[i]) for i in range(len(other_frames_in_the_bin))]
-    return distances
-
 def get_assigns_no_map_no_unbox(assignments, nstates):
     index_list_by_bin = [[] for i in range(nstates)]
     # handle the case where there is only 1 trajectory,
@@ -98,6 +94,10 @@ def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, m
                    for state_ixs, number_desired in zip(all_state_indices, numbers_desired))
     return list(chosen_inds)
 
+def calc_euclidean_distance(reference,other_frames_in_the_bin):
+    distances = [euclidean(reference,other_frames_in_the_bin[i]) for i in range(len(other_frames_in_the_bin))]
+    return distances
+
 def map_features(assignments, nstates, mapping,features):
     mapped_features = []
     all_state_indices = get_assign_inds(assignments, nstates, mapping)
@@ -105,12 +105,13 @@ def map_features(assignments, nstates, mapping,features):
         bin_features = []
         for frame in bin:
             bin_features.append(features[frame[0]][frame[1]])
-        mapped_features[num_bin].append(bin_features)
-    return ra.RaggedArraty(mapped_features)
+        mapped_features.append(bin_features)
+    return ra.RaggedArray(mapped_features)
 
-    
-    
-    
+def kmeans_cluster(features,n_clusters):
+    kmeans = KMeans(n_clusters=n_clusters).fit(features)
+    return kmeans.cluster_centers_
+
 
 # def get_specified_number_per_bin_random_features(assignments, nstates, numbers_desired, mapping, replace=False,
 #                                         gen=np.random.default_rng()):
