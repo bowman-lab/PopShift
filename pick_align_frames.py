@@ -94,13 +94,13 @@ def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, m
     return list(chosen_inds)
 
 def calc_euclidean_distance(reference,other_frames_in_the_bin):
-    distances = [euclidean(reference,other_frames_in_the_bin[i]) for i in range(len(other_frames_in_the_bin))]
+    distances = [euclidean(reference,other_frames_in_the_bin[num]) for num in range(len(other_frames_in_the_bin))]
     return distances
 
 def map_features(assignments, nstates, mapping,features):
     mapped_features = []
     all_state_indices = get_assign_inds(assignments, nstates, mapping)
-    for num_bin,bin in enumerate(all_state_indices):
+    for bin in all_state_indices:
         bin_features = []
         for frame in bin:
             bin_features.append(features[frame[0]][frame[1]])
@@ -114,9 +114,9 @@ def kmeans_cluster(features,n_clusters):
 def find_closest_frame(cluster_centers,features,indices):
     all_indices = []
     for num,bin in enumerate(cluster_centers):
-        distances = [calc_euclidean_distance(i,features[num]) for i in bin]
-        min_distance = [np.min(i) for i in distances] #! Not sure if i want/need this, might be interesting to print out
-        min_distance_loc = [np.where(i==np.min(i)) for i in distances]
+        distances = [calc_euclidean_distance(frame,features[num]) for frame in bin]
+        min_distance = [np.min(dist) for dist in distances] #! Not sure if i want/need this, might be interesting to print out
+        min_distance_loc = [np.where(dist==np.min(dist)) for dist in distances]
         frames_to_extract = [indices[num][min_distance_loc[i][0]] for i in range(len(min_distance_loc))]
         all_indices.append(frames_to_extract)
     return all_indices
@@ -125,7 +125,7 @@ def get_frames_using_kmeans(assignments, nstates,features,n_clusters,mapping):
     print('Mapping features to bins')
     mapped_features,all_state_indices = map_features(assignments, nstates, mapping,features)
     print('KMeans clustering of the frames within bins using features provided')
-    cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)] #! This line seems slow for some reason, use mp.pool for this
+    cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)] #! This line seems slow for some reason (not slow in my jupyter nb)
     print('Looking for frames closest to each kmeans center')
     indices_to_extract = find_closest_frame(cluster_centers,mapped_features,all_state_indices)
     indices_to_extract = [np.concatenate(i) for i in indices_to_extract]
