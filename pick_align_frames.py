@@ -7,7 +7,8 @@ import loos
 from loos import pyloos
 import json
 from sys import argv
-
+from scipy.spatial.distance import euclidean
+from sklearn.cluster import KMeans
 
 def floatpair(s, delim=','):
     try:
@@ -16,6 +17,9 @@ def floatpair(s, delim=','):
     except:
         raise argparse.ArgumentTypeError('Float pairs must be specified as "decimal.one,decimal.two"')
 
+def calc_euclidean_distance(reference,other_frames_in_the_bin):
+    distances = [euclidean(reference,other_frames_in_the_bin[i]) for i in range(len(other_frames_in_the_bin))]
+    return distances
 
 def get_assigns_no_map_no_unbox(assignments, nstates):
     index_list_by_bin = [[] for i in range(nstates)]
@@ -89,10 +93,32 @@ def get_random_per_bin(assignments, n_states, number_desired, mapping, replace=F
 def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, mapping, replace=False,
                                         gen=np.random.default_rng()):
     all_state_indices = get_assign_inds(assignments, nstates, mapping)
+    print(all_state_indices)
     chosen_inds = (gen.choice(state_ixs, number_desired, axis=0, replace=replace)
                    for state_ixs, number_desired in zip(all_state_indices, numbers_desired))
     return list(chosen_inds)
 
+def map_features(assignments, nstates, mapping,features):
+    mapped_features = []
+    all_state_indices = get_assign_inds(assignments, nstates, mapping)
+    for num_bin,bin in enumerate(all_state_indices):
+        bin_features = []
+        for frame in bin:
+            bin_features.append(features[frame[0]][frame[1]])
+        mapped_features[num_bin].append(bin_features)
+    return ra.RaggedArraty(mapped_features)
+
+    
+    
+    
+
+# def get_specified_number_per_bin_random_features(assignments, nstates, numbers_desired, mapping, replace=False,
+#                                         gen=np.random.default_rng()):
+#     all_state_indices = get_assign_inds(assignments, nstates, mapping)
+    
+#     chosen_inds = (gen.choice(state_ixs, number_desired, axis=0, replace=replace)
+#                    for state_ixs, number_desired in zip(all_state_indices, numbers_desired))
+#     return list(chosen_inds)
 
 def get_centers(assigs, nstates, nd, mapping):
     return np.array([[0, i] for i in range(nstates)]).reshape(nstates, 1, 2)
