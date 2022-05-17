@@ -106,12 +106,27 @@ def map_features(assignments, nstates, mapping,features):
         for frame in bin:
             bin_features.append(features[frame[0]][frame[1]])
         mapped_features.append(bin_features)
-    return ra.RaggedArray(mapped_features)
+    return (ra.RaggedArray(mapped_features),all_state_indices)
 
 def kmeans_cluster(features,n_clusters):
     kmeans = KMeans(n_clusters=n_clusters).fit(features)
     return kmeans.cluster_centers_
 
+def find_closest_frame(cluster_centers,features,indices):
+    all_indices = []
+    for num,bin in enumerate(cluster_centers):
+        distances = [calc_euclidean_distance(i,features[num]) for i in bin]
+        min_distance = [np.min(i) for i in distances]
+        min_distance_loc = [np.where(i==np.min(i)) for i in distances]
+        frames_to_extract = [indices[num][min_distance_loc[i][0]] for i in range(len(min_distance_loc))]
+        all_indices.append(frames_to_extract)
+    return all_indices
+
+def find_frames_to_extract(assignments, nstates, mapping,features,n_clusters):
+    mapped_features,all_state_indices = map_features(assignments, nstates, mapping,features)
+    cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)]
+    indices_to_extract = find_closest_frame(cluster_centers,mapped_features,all_state_indices)
+    return indices_to_extract
 
 # def get_specified_number_per_bin_random_features(assignments, nstates, numbers_desired, mapping, replace=False,
 #                                         gen=np.random.default_rng()):
