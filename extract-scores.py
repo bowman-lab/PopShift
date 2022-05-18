@@ -16,10 +16,20 @@ def extract_score_from_vina_pdbqt(pdbqts: list, search_re=re.compile(r'^REMARK V
                     break
     return np.array(outlist, dtype='f4')
 
+def extract_score_from_smina_pdbqt(pdbqts: list, search_re=re.compile(r'^REMARK minimizedAffinity')):
+    outlist = []
+    for pdbqt in pdbqts:
+        with pdbqt.open() as f:
+            for line in f:
+                if search_re.match(line):
+                    outlist.append(float(line.split(maxsplit=4)[2]))
+                    break
+    return np.array(outlist, dtype='f4')
+
 
 extract_methods = {
     'vina': extract_score_from_vina_pdbqt,
-    'smina': None  # add this later. should be easy.
+    'smina': extract_score_from_smina_pdbqt
 }
 
 parser = argparse.ArgumentParser()

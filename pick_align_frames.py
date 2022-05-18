@@ -260,7 +260,7 @@ if __name__ == '__main__':
         align_sel += " ("+args.align_selection+")"
 
     # get frame counts, however it's prescribed
-    mapping = None
+ 
     if args.total_per_bin:
         frame_counts = np.loadtxt(args.total_per_bin, dtype=int)
 
@@ -274,18 +274,21 @@ if __name__ == '__main__':
             print(args.number_frames)
             print('Exiting.')
             exit(1)
-        if args.mapping:
-            if args.mapping.suffix == '.json':
-                mapping = json.load(args.mapping.open())
-            elif args.mapping.suffix == '.npy':
-                mapping = np.load(args.eq_probs, allow_pickle=True).item().mapping_.to_mapped
-            else:
-                print(args.mapping, 'does not have an extension that implies it is either a pickled msm or a mapping '
-                                    'object (.json or .numpy). Unsupported format. Exiting.')
-                exit(2)
+    
         frame_counts = args.number_frames
-    else:
+    else:  # this is in the event that we have no assignments, and are just pulling centers
         frame_counts = 1
+    
+    mapping = None
+    if args.mapping:
+        if args.mapping.suffix == '.json':
+            mapping = json.load(args.mapping.open())
+        elif args.mapping.suffix == '.npy':
+            mapping = np.load(args.mapping, allow_pickle=True).item().mapping_.to_mapped
+        else:
+            print(args.mapping, 'does not have an extension that implies it is either a pickled msm or a mapping '
+                                'object (.json or .numpy). Unsupported format. Exiting.')
+            exit(2)
 
     chosen_frames = frame_selectors[args.frame_selector](
         assignments,

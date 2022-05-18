@@ -31,8 +31,8 @@ def preplig_vina(ligand, a_flag=None):
 # Adds antechamber charges to the ligand pdb
 def add_charges(ligand):
     name = ligand.split('.')[0]
-    sp.run('antechamber -i %s -fi pdb -o %s.mol2 -fo mol2 -c bcc -at gaff2' % (ligand, name),shell=True)
-    return '%s.mol2' % name
+    sp.run(f'antechamber -i {ligand} -fi pdb -o {name}.mol2 -fo mol2 -c bcc -at gaff2',shell=True)
+    return f'{name}.mol2'
 
 # Converts to pdbqt using user provided charges
 def preplig(ligand, a_flag=None):
@@ -46,10 +46,10 @@ def preplig(ligand, a_flag=None):
 # Converts protein pdb to pdbqt file
 def prep_receptor(receptor, out, name, a_flag=None):
     if a_flag:
-        sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%s.pdbqt' % (out, name), '-A', a_flag])
+        sp.run(['prepare_receptor', '-r', receptor, '-o', f'{out}/{name}.pdbqt', '-A', a_flag])
     else:
-        sp.run(['prepare_receptor', '-r', receptor, '-o', '%s/%s.pdbqt' % (out, name)])
-    return '%s/%s.pdbqt' % (out, name)
+        sp.run(['prepare_receptor', '-r', receptor, '-o', f'{out}/{name}.pdbqt'])
+    return f'{out}/{name}.pdbqt'
 
 charge_methods={
     'vina': preplig_vina,
@@ -90,18 +90,17 @@ if args.ligand_dir is not None:
     os.chdir(home)
     #charged_ligands = list(pool.map(charge_methods[args.charge], ligands)) #! Currently not using map, because it makes all the ligands have the same atoms with different charges for yet unknown reason
     if args.charge == 'antechamber':
-        charged_ligands = sorted(glob.glob('%s/*mol2' % path_lig))
+        charged_ligands = sorted(glob.glob(f'{path_lig}/*mol2'))
         list(pool.map(preplig,charged_ligands))
 else:
-    print('Assuming ligands have been already converted to pdbqts with partial charges')
+    print('Assuming ligands have partial charges assigned')
 
 # Converting protein pdbs to pdbqts
 if args.protein_dir is not None: #Checking whether proteins should be converted too
-    frames = sorted(glob.glob('%s/receptor/*/*pdb' % path_prot))
+    frames = sorted(glob.glob(f'{path_prot}/receptor/*/*pdb'))
     prot_name = [Path(frame).stem for frame in frames]
     directory = [os.path.dirname(frame) for frame in frames]
     prep = partial(prep_receptor, a_flag=args.a_flag)
-    #output_list = ['%s/%s.pdbqt' % (directory[i],prot_name[i]) for i in range(len(directory))]
     arguments = zip(frames, directory, prot_name)
     list(pool.starmap(prep, arguments))
 

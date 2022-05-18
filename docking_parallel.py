@@ -35,18 +35,17 @@ def dock_vina(box_center, box_size, exhaustiveness, receptor_path, ligand_path, 
 
 @TaskGenerator
 def dock_smina(box_center, box_size, exhaustiveness, receptor_path, ligand_path, output_path):
-    output_fn = str(output_path)
-    return sp.run(['smina', '--receptor', receptor_path, '--ligand', ligand_path, \
-        '--center_x', '%s' % box_center[0], \
-        '--center_y', '%s' % box_center[1], \
-        '--center_z', '%s' % box_center[2], \
-        '--size_x', '%s' % box_size[0], \
-        '--size_y', '%s' % box_size[1], \
-        '--size_z', '%s' % box_size[2], \
-        '--exhaustiveness', '%s' % exhaustiveness, \
-        '--cpu', '%s' % exhaustiveness, \
+    return sp.run(['smina', '--receptor', str(receptor_path), '--ligand', str(ligand_path), \
+        '--center_x', f'{box_center[0]}', \
+        '--center_y', f'{box_center[1]}', \
+        '--center_z', f'{box_center[2]}', \
+        '--size_x', f'{box_size[0]}', \
+        '--size_y', f'{box_size[1]}', \
+        '--size_z', f'{box_size[2]}', \
+        '--exhaustiveness', f'{exhaustiveness}', \
+        '--cpu', '1', \
         '--num_modes','1', \
-        '--out', output_fn], shell=True, check=True)
+        '--out', str(output_path)])
 
 
 docking_methods = {
