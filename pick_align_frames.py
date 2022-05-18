@@ -153,7 +153,7 @@ def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs):
         pdb_path.write_text(str(pdb))  # will close file handle after writing
 
 
-def add_boonds_two_cuts(model: loos.AtomicGroup, heavy_cutoff: float, hydrogen_cutoff: float):
+def add_bonds_two_cuts(model: loos.AtomicGroup, heavy_cutoff: float, hydrogen_cutoff: float):
     # select just the heavy atoms from the model
     heavies = loos.selectAtoms(model, '!hydrogen')
     # populate the bonds in the heavy-atom only file using the heavy cutoff
@@ -243,7 +243,7 @@ if __name__ == '__main__':
         if args.find_bonds:
             print('Defining bonds using distance cutoffs; ', args.find_bonds[0], 'angstrom for heavy atoms, and ',
                   args.find_bonds[1], 'angstroms for hydrogens.')
-            model = add_boonds_two_cuts(model, *args.find_bonds)
+            model = add_bonds_two_cuts(model, *args.find_bonds)
     # AutoDock usually needs this to produce working parameterizations.
     if args.make_receptor_sel_chain_A:
         for atom in model:
