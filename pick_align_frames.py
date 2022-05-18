@@ -332,7 +332,7 @@ if __name__ == '__main__':
             exit(2)
 
     if args.features:
-        features = ra.load(f'{args.features}')
+        features = ra.load(f'{args.features}') #! Should change this, so that it doesn't only depend on enspara ra.load
         chosen_frames = frame_selectors[args.frame_selector](
         assignments,
         eq_probs.shape[0],
