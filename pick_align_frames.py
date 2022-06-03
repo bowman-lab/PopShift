@@ -118,7 +118,7 @@ def find_closest_frame(cluster_centers,features,indices):
         min_distance = [np.min(dist) for dist in distances] #! Not sure if i want/need this, might be interesting to print out
         min_distance_loc = [np.where(dist==np.min(dist)) for dist in distances]
         if len(min_distance_loc[0]) > 1:
-            min_distance_loc = min_distance_loc[0][0] #! Change this to random choice
+            min_distance_loc = np.random.default_rng().choice(min_distance_loc[0],1, axis=0, replace=False)[0]
         frames_to_extract = [indices[num][min_distance_loc[i][0]] for i in range(len(min_distance_loc))]
         all_indices.append(frames_to_extract)
     return all_indices
@@ -129,7 +129,7 @@ def get_frames_using_kmeans(assignments, nstates,features,n_clusters,mapping):
     print('KMeans clustering of the frames within bins using features provided')
     cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)] #! This line seems slow for some reason (not slow in my jupyter nb)
     print('Looking for frames closest to each kmeans center')
-    indices_to_extract = find_closest_frame(cluster_centers,mapped_features,all_state_indices)
+    indices_to_extract = find_closest_frame(cluster_centers,mapped_features,all_state_indices) #! Use multiprocessing here
     indices_to_extract = [np.concatenate(i) for i in indices_to_extract]
     print('Done')
     return indices_to_extract
