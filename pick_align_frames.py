@@ -117,6 +117,8 @@ def find_closest_frame(cluster_centers,features,indices):
         distances = [calc_euclidean_distance(frame,features[num]) for frame in bin]
         min_distance = [np.min(dist) for dist in distances] #! Not sure if i want/need this, might be interesting to print out
         min_distance_loc = [np.where(dist==np.min(dist)) for dist in distances]
+        if len(min_distance_loc[0]) > 1:
+            min_distance_loc = min_distance_loc[0][0] #! Change this to random choice
         frames_to_extract = [indices[num][min_distance_loc[i][0]] for i in range(len(min_distance_loc))]
         all_indices.append(frames_to_extract)
     return all_indices
