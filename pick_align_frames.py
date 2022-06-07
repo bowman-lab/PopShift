@@ -347,7 +347,7 @@ if __name__ == '__main__':
             exit(2)
 
     if args.features:
-        features = ra.load(f'{args.features}') #! Should change this, so that it doesn't only depend on enspara ra.load
+        features = ra.load(args.features)
         chosen_frames = frame_selectors[args.frame_selector](
         assignments,
         eq_probs.shape[0],
@@ -374,6 +374,7 @@ if __name__ == '__main__':
             traj_paths.append(p_trjs)
     else:
         traj_paths = args.traj_paths
+        print(traj_paths)
     print('aligning with the following selection string:')
     print(align_sel)
     out_path = Path(args.receptor_name) / 'receptor'
