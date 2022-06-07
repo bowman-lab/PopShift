@@ -130,6 +130,10 @@ def simple_avg(trimmed_binding_fes):
     return np.mean(trimmed_binding_fes)
 
 
+def best_score(trimmed_binding_fes):
+    return np.min(trimmed_binding_fes)
+
+
 def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath, lengths=None):
     msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
     kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
@@ -142,11 +146,13 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, ou
         ra.save(str(outpath/(tag+'-eq_probs.h5')), ra.RaggedArray(reweights, lengths=lengths))
     weighted = weighted_avg(frame_weights, trimmed_fes)
     simple = simple_avg(trimmed_fes)
+    best = best_score(trimmed_fes)
     return {
         'msm dG': float(msm_binding),
         'msm K_D': float(kd),
         'weighted avg': float(weighted),
-        'simple avg': float(simple)
+        'simple avg': float(simple),
+        'best score': float(best)
     }
 
 
