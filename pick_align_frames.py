@@ -206,7 +206,6 @@ def add_boonds_two_cuts(model: loos.AtomicGroup, heavy_cutoff: float, hydrogen_c
 def pyemma_mapping(msm_obj):
     mapping = {}
     for i,j in zip(range(msm_obj.nstates_full),msm_obj.active_set):
-        num = 0
         if i == j:
             mapping[j] = i
         else:
@@ -340,11 +339,11 @@ if __name__ == '__main__':
             mapping = np.load(args.mapping, allow_pickle=True).item().mapping_.to_mapped
         elif args.mapping.suffix == '.pickle':
             msm = np.load(args.mapping, allow_pickle=True)
-            mapping = np.array(pyemma_mapping(msm))
+            mapping = pyemma_mapping(msm)
 
         else:
             print(args.mapping, 'does not have an extension that implies it is either a pickled msm or a mapping '
-                                'object (.json or .numpy). Unsupported format. Exiting.')
+                                'object (.json, .numpy or .pickle). Unsupported format. Exiting.')
             exit(2)
 
     if args.features:
