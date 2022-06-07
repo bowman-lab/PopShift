@@ -203,6 +203,16 @@ def add_boonds_two_cuts(model: loos.AtomicGroup, heavy_cutoff: float, hydrogen_c
     # return a new atomic group that merges the two separate groups.
     return model.merge(heavies)
 
+def pyemma_mapping(msm_obj):
+    mapping = {}
+    for i,j in zip(range(msm_obj.nstates_full),msm_obj.active_set):
+        num = 0
+        if i == j:
+            mapping[j] = i
+        else:
+            mapping[j] = range(msm_obj.nstates_full)[i]
+    return mapping
+
 
 frame_selectors = {
     'random': get_random_per_bin,
@@ -321,13 +331,17 @@ if __name__ == '__main__':
         frame_counts = args.number_frames
     else:  # this is in the event that we have no assignments, and are just pulling centers
         frame_counts = 1
-    
+
     mapping = None
     if args.mapping:
         if args.mapping.suffix == '.json':
             mapping = json.load(args.mapping.open())
         elif args.mapping.suffix == '.npy':
             mapping = np.load(args.mapping, allow_pickle=True).item().mapping_.to_mapped
+        elif args.mapping.suffix == '.pickle':
+            msm = np.load(args.mapping, allow_pickle=True)
+            mapping = np.array(pyemma_mapping(msm))
+
         else:
             print(args.mapping, 'does not have an extension that implies it is either a pickled msm or a mapping '
                                 'object (.json or .numpy). Unsupported format. Exiting.')
