@@ -9,6 +9,7 @@ import json
 from sys import argv
 from scipy.spatial.distance import euclidean
 from sklearn.cluster import KMeans
+import pickle
 
 def floatpair(s, delim=','):
     try:
@@ -282,7 +283,11 @@ if __name__ == '__main__':
     try:
         eq_probs = np.load(args.eq_probs)
     except ValueError:
-        eq_probs = np.load(args.eq_probs, allow_pickle=True).item().eq_probs_
+        try:
+            eq_probs = np.load(args.eq_probs, allow_pickle=True).item().eq_probs_
+        except AttributeError:
+            with open(args.eq_probs, 'rb') as f:
+                eq_probs = pickle.dump(f).pi
 
     if args.frame_selector == 'centers':
         assignments = np.arange(eq_probs.shape[0])
