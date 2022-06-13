@@ -11,12 +11,14 @@ from scipy.spatial.distance import euclidean
 from sklearn.cluster import KMeans
 import pickle
 
+
 def floatpair(s, delim=','):
     try:
         start_ind, end_ind = map(float, s.split(delim))
         return start_ind, end_ind
     except:
         raise argparse.ArgumentTypeError('Float pairs must be specified as "decimal.one,decimal.two"')
+
 
 def get_assigns_no_map_no_unbox(assignments, nstates):
     index_list_by_bin = [[] for i in range(nstates)]
@@ -26,6 +28,7 @@ def get_assigns_no_map_no_unbox(assignments, nstates):
         for frame_index, cluster_index in enumerate(dtraj):
             index_list_by_bin[cluster_index].append((traj_index, frame_index))
     return index_list_by_bin
+
 
 def get_assigns_no_map_unbox(assignments, nstates):
     index_list_by_bin = [[] for i in range(nstates)]
@@ -48,6 +51,7 @@ def get_assigns_map_no_unbox(assignments, nstates, mapping):
             except KeyError:
                 pass
     return index_list_by_bin
+
 
 def get_assigns_map_unbox(assignments, nstates, mapping):
     # use try statement to filter states that have been trimmed
@@ -101,11 +105,13 @@ def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, m
                    for state_ixs, number_desired in zip(all_state_indices, numbers_desired))
     return list(chosen_inds)
 
-def calc_euclidean_distance(reference,other_frames_in_the_bin):
-    distances = [euclidean(reference,other_frames_in_the_bin[num]) for num in range(len(other_frames_in_the_bin))]
+
+def calc_euclidean_distance(reference, other_frames_in_the_bin):
+    distances = [euclidean(reference, other_frames_in_the_bin[num]) for num in range(len(other_frames_in_the_bin))]
     return distances
 
-def map_features(assignments, nstates, mapping,features):
+
+def map_features(assignments, nstates, mapping, features):
     mapped_features = []
     all_state_indices = get_assign_inds(assignments, nstates, mapping)
     for bin in all_state_indices:
@@ -113,34 +119,42 @@ def map_features(assignments, nstates, mapping,features):
         for frame in bin:
             bin_features.append(features[frame[0]][frame[1]])
         mapped_features.append(bin_features)
-    return (ra.RaggedArray(mapped_features),all_state_indices)
+    return (ra.RaggedArray(mapped_features), all_state_indices)
 
-def kmeans_cluster(features,n_clusters):
+
+def kmeans_cluster(features, n_clusters):
     kmeans = KMeans(n_clusters=n_clusters).fit(features)
     return kmeans.cluster_centers_
 
-def find_closest_frame(cluster_centers,features,indices):
+
+def find_closest_frame(cluster_centers, features, indices):
     all_indices = []
-    for num,bin in enumerate(cluster_centers):
-        distances = [calc_euclidean_distance(frame,features[num]) for frame in bin]
-        min_distance = [np.min(dist) for dist in distances] #! Not sure if i want/need this, might be interesting to print out
-        min_distance_loc = [np.where(dist==np.min(dist)) for dist in distances]
+    for num, bin in enumerate(cluster_centers):
+        distances = [calc_euclidean_distance(frame, features[num]) for frame in bin]
+        min_distance = [np.min(dist) for dist in
+                        distances]  # ! Not sure if i want/need this, might be interesting to print out
+        min_distance_loc = [np.where(dist == np.min(dist)) for dist in distances]
         if len(min_distance_loc[0]) > 1:
-            min_distance_loc = np.random.default_rng().choice(min_distance_loc[0],1, axis=0, replace=False)[0]
+            min_distance_loc = np.random.default_rng().choice(min_distance_loc[0], 1, axis=0, replace=False)[0]
         frames_to_extract = [indices[num][min_distance_loc[i][0]] for i in range(len(min_distance_loc))]
         all_indices.append(frames_to_extract)
     return all_indices
 
-def get_frames_using_kmeans(assignments, nstates,features,n_clusters,mapping):
+
+def get_frames_using_kmeans(assignments, nstates, features, n_clusters, mapping):
     print('Mapping features to bins')
-    mapped_features,all_state_indices = map_features(assignments, nstates, mapping,features)
+    mapped_features, all_state_indices = map_features(assignments, nstates, mapping, features)
     print('KMeans clustering of the frames within bins using features provided')
-    cluster_centers = [kmeans_cluster(bin_features,number) for bin_features,number in zip(mapped_features,n_clusters)] #! This line seems slow for some reason (not slow in my jupyter nb)
+    # ! This line seems slow for some reason (not slow in my jupyter nb)
+    cluster_centers = [kmeans_cluster(bin_features, number) for bin_features, number in zip(mapped_features,
+                                                                                            n_clusters)]
     print('Looking for frames closest to each kmeans center')
-    indices_to_extract = find_closest_frame(cluster_centers,mapped_features,all_state_indices) #! Use multiprocessing here
+    indices_to_extract = find_closest_frame(cluster_centers, mapped_features,
+                                            all_state_indices)  # ! Use multiprocessing here
     indices_to_extract = [np.concatenate(i) for i in indices_to_extract]
     print('Done')
     return indices_to_extract
+
 
 def get_centers(assigs, nstates, nd, mapping):
     return np.array([[0, i] for i in range(nstates)]).reshape(nstates, 1, 2)
@@ -166,7 +180,8 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, tra
             try:
                 frame = trajectories[trj_ix].readFrame(fra_ix)
             except KeyError:
-                trajectories[trj_ix] = pyloos.Trajectory(str(traj_paths[trj_ix]), model, subset=subset_selection)
+                trj_name = str(traj_paths[trj_ix])
+                trajectories[trj_ix] = pyloos.Trajectory(trj_name, model, subset=subset_selection)
                 frame = trajectories[trj_ix].readFrame(fra_ix)
 
             align_vec.push_back(loos.selectAtoms(frame, align_selection).copy())
@@ -215,9 +230,10 @@ def add_bonds_two_cuts(model: loos.AtomicGroup, heavy_cutoff: float, hydrogen_cu
     # return a new atomic group that merges the two separate groups.
     return model.merge(heavies)
 
+
 def pyemma_mapping(msm_obj):
     mapping = {}
-    for i,j in zip(range(msm_obj.nstates_full),msm_obj.active_set):
+    for i, j in zip(range(msm_obj.nstates_full), msm_obj.active_set):
         if i == j:
             mapping[j] = i
         else:
@@ -323,12 +339,12 @@ if __name__ == '__main__':
 
     # if filename is provided read its contents to obtain align string
     try:
-        align_sel += " ("+Path(args.align_selection).read_text()+")"
+        align_sel += " (" + Path(args.align_selection).read_text() + ")"
     except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
-        align_sel += " ("+args.align_selection+")"
+        align_sel += " (" + args.align_selection + ")"
 
     # get frame counts, however it's prescribed
- 
+
     if args.total_per_bin:
         frame_counts = np.loadtxt(args.total_per_bin, dtype=int)
 
@@ -342,7 +358,7 @@ if __name__ == '__main__':
             print(args.number_frames)
             print('Exiting.')
             exit(1)
-    
+
         frame_counts = args.number_frames
     else:  # this is in the event that we have no assignments, and are just pulling centers
         frame_counts = 1
@@ -365,18 +381,18 @@ if __name__ == '__main__':
     if args.features:
         features = ra.load(args.features)
         chosen_frames = frame_selectors[args.frame_selector](
-        assignments,
-        eq_probs.shape[0],
-        features,
-        frame_counts,
-        mapping
+            assignments,
+            eq_probs.shape[0],
+            features,
+            frame_counts,
+            mapping
         )
     else:
         chosen_frames = frame_selectors[args.frame_selector](
-        assignments,
-        eq_probs.shape[0],
-        frame_counts,
-        mapping
+            assignments,
+            eq_probs.shape[0],
+            frame_counts,
+            mapping
         )
 
     if len(args.traj_paths) == 1:
