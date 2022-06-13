@@ -64,9 +64,16 @@ def get_assigns_map_unbox(assignments, nstates, mapping):
 
 
 def get_assign_inds(assignments, nstates, mapping=None):
-    # handle the case where there is only 1 trajectory,
+    # Handle the case where there is only 1 trajectory,
     # meaning the ragged array doesn't have singleton elements at the tightest level.
-    if assignments.shape[0] == 1:
+    if len(assignments.shape) == 1:
+        if mapping:
+            index_list_by_bin = get_assigns_map_no_unbox(assignments, nstates, mapping)
+        else:
+            index_list_by_bin = get_assigns_no_map_no_unbox(assignments, nstates)
+    # Handle the case where the last element in the shape of the RA is 1 (when it should be 'None').
+    # This is interpreted as having singleton elements at the tightest level, and thus unboxing them.
+    elif assignments.shape[-1] == 1:
         if mapping:
             index_list_by_bin = get_assigns_map_unbox(assignments, nstates, mapping)
         else:
