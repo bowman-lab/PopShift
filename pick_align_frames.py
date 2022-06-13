@@ -287,7 +287,7 @@ if __name__ == '__main__':
             eq_probs = np.load(args.eq_probs, allow_pickle=True).item().eq_probs_
         except AttributeError:
             with open(args.eq_probs, 'rb') as f:
-                eq_probs = pickle.dump(f).pi
+                eq_probs = pickle.load(f).pi
 
     if args.frame_selector == 'centers':
         assignments = np.arange(eq_probs.shape[0])
