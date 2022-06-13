@@ -147,16 +147,20 @@ def unpickle_resave_centers(centersfn):
 
 
 def rip_conformations(chosen_inds, model, subset_selection, align_selection, traj_paths):
-    trajectories = [pyloos.Trajectory(str(traj_path), model, subset=subset_selection) for traj_path in traj_paths]
+    trajectories = {}  # will be an int-keyed dict
     full_inds = []
     subset_vec = loos.AtomicGroupVector()
     align_vec = loos.AtomicGroupVector()
 
     # read selected frames into memory
     for bin_ix, samples in enumerate(chosen_inds):
-
         for trj_ix, fra_ix in samples:
-            frame = trajectories[trj_ix].readFrame(fra_ix)
+            try:
+                frame = trajectories[trj_ix].readFrame(fra_ix)
+            except KeyError:
+                trajectories[trj_ix] = pyloos.Trajectory(str(traj_paths[trj_ix]), model, subset=subset_selection)
+                frame = trajectories[trj_ix].readFrame(fra_ix)
+
             align_vec.push_back(loos.selectAtoms(frame, align_selection).copy())
             subset_vec.push_back(frame.copy())
             full_inds.append((bin_ix, trj_ix, fra_ix))
