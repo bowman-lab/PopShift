@@ -21,6 +21,7 @@ def floatpair(s, delim=','):
 
 
 def get_assigns_no_map_no_unbox(assignments, nstates):
+    print('Getting assignments for each bin without any mapping or unboxing.')
     index_list_by_bin = [[] for i in range(nstates)]
     # handle the case where there is only 1 trajectory,
     # meaning the ragged array doesn't have singleton elements at the tightest level.
@@ -31,6 +32,7 @@ def get_assigns_no_map_no_unbox(assignments, nstates):
 
 
 def get_assigns_no_map_unbox(assignments, nstates):
+    print('Getting assignments for each bin without any mapping. Unbox singletons at deepest layer of RA.')
     index_list_by_bin = [[] for i in range(nstates)]
     # iterating over RA assign contents produces singleton arrays of dtype=int32
     # that need to be unpacked for use
@@ -41,6 +43,7 @@ def get_assigns_no_map_unbox(assignments, nstates):
 
 
 def get_assigns_map_no_unbox(assignments, nstates, mapping):
+    print('Getting assignments for each bin from a map, no unboxing')
     # use try statement to filter states that have been trimmed
     index_list_by_bin = [[] for i in range(nstates)]
     for traj_index, dtraj in enumerate(assignments):
@@ -56,6 +59,7 @@ def get_assigns_map_no_unbox(assignments, nstates, mapping):
 def get_assigns_map_unbox(assignments, nstates, mapping):
     # use try statement to filter states that have been trimmed
     # unbox the singleton cluster index arrays
+    print('Getting assignments for each bin from a map, unboxing singletons at deepest layer of RA.')
     index_list_by_bin = [[] for i in range(nstates)]
     for traj_index, dtraj in enumerate(assignments):
         for frame_index, cluster_index in enumerate(dtraj):
