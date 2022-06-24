@@ -173,32 +173,32 @@ def unpickle_resave_centers(centersfn):
 
 
 def rip_conformations(chosen_inds, model, subset_selection, align_selection, traj_paths):
-    # convert to RA to keep track of irregular bin samples in the case of custom sampling per bin.
-    chosen_ra = ra.RaggedArray(chosen_inds)
-    # the index into the flattened array at which each new element in the ragged dimension starts
-    starts = chosen_ra.starts
-
-    flat_chosen = chosen_ra.flatten()
-    sorted_chosen = np.argsort(flat_chosen, order=['traj', 'frame'])
     # This'll be a flat array that'll include everything needed to index a frame.
-    full_inds = np.zeros(len(chosen_ra), dtype=['bin', 'traj', 'frame'])
-    
-    # instantiate loos vectors to do iterative alignment.
-    subset_vec = loos.AtomicGroupVector(len(flat_chosen))
-    align_vec = loos.AtomicGroupVector(len(flat_chosen))
+    full_inds = np.array([(bin_ix, trj_ix, fra_ix) for bin_ix, samples in enumerate(chosen_inds)
+                          for trj_ix, fra_ix in samples],
+                         dtype=[('bin', int), ('traj', int), ('frame', int)])
+    sorted_chosen = np.argsort(full_inds, order=['traj', 'frame', 'bin'])
 
+    # instantiate loos vectors to do iterative alignment.
+    subset_vec = loos.AtomicGroupVector(len(full_inds))
+    align_vec = loos.AtomicGroupVector(len(full_inds))
+
+    # set up the atomic groups that readFrame will update (they'll be references)
+    frame = loos.selectAtoms(model, subset_selection)
+    align_subset = loos.selectAtoms(model, align_selection)
+    # track previously read-from traj to see if we need to change which one is open.
     prev_trj = None
+    # loop over the selected frame indices.
     for sort_ix in sorted_chosen:
-        trj_ix, fra_ix = flat_chosen[sort_ix]
+        _, trj_ix, fra_ix = full_inds[sort_ix]
         trj_name = traj_paths[trj_ix]
         if trj_name != prev_trj:
             trj = pyloos.Trajectory(trj_name, model, subset=subset_selection)
         prev_trj = trj_name
-        frame = trj.readFrame(fra_ix)
-        align_vec[sort_ix] = loos.selectAtoms(frame, align_selection).copy()
-        subset_vec[sort_ix] = frame.copy()  # readFrame returns a ref to the traj's internal AG.
-        bin_ix = np.searchsorted(starts, sort_ix, side='right') - 1
-        full_inds[sort_ix] = (bin_ix, trj_ix, fra_ix)
+        trj.readFrame(fra_ix)
+        # readFrame returns a ref to the traj's internal AG, so both product AGs need to be copied.
+        align_vec[sort_ix] = align_subset.copy()
+        subset_vec[sort_ix] = frame.copy()
 
     return full_inds, subset_vec, align_vec
 
