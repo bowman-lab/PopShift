@@ -173,24 +173,32 @@ def unpickle_resave_centers(centersfn):
 
 
 def rip_conformations(chosen_inds, model, subset_selection, align_selection, traj_paths):
-    trajectories = {}  # will be an int-keyed dict
-    full_inds = []
-    subset_vec = loos.AtomicGroupVector()
-    align_vec = loos.AtomicGroupVector()
+    # convert to RA to keep track of irregular bin samples in the case of custom sampling per bin.
+    chosen_ra = ra.RaggedArray(chosen_inds)
+    # the index into the flattened array at which each new element in the ragged dimension starts
+    starts = chosen_ra.starts
 
-    # read selected frames into memory
-    for bin_ix, samples in enumerate(chosen_inds):
-        for trj_ix, fra_ix in samples:
-            try:
-                frame = trajectories[trj_ix].readFrame(fra_ix)
-            except KeyError:
-                trj_name = str(traj_paths[trj_ix])
-                trajectories[trj_ix] = pyloos.Trajectory(trj_name, model, subset=subset_selection)
-                frame = trajectories[trj_ix].readFrame(fra_ix)
+    flat_chosen = chosen_ra.flatten()
+    sorted_chosen = np.argsort(flat_chosen, order=['traj', 'frame'])
+    # This'll be a flat array that'll include everything needed to index a frame.
+    full_inds = np.zeros(len(chosen_ra), dtype=['bin', 'traj', 'frame'])
+    
+    # instantiate loos vectors to do iterative alignment.
+    subset_vec = loos.AtomicGroupVector(len(flat_chosen))
+    align_vec = loos.AtomicGroupVector(len(flat_chosen))
 
-            align_vec.push_back(loos.selectAtoms(frame, align_selection).copy())
-            subset_vec.push_back(frame.copy())
-            full_inds.append((bin_ix, trj_ix, fra_ix))
+    prev_trj = None
+    for sort_ix in sorted_chosen:
+        trj_ix, fra_ix = flat_chosen[sort_ix]
+        trj_name = traj_paths[trj_ix]
+        if trj_name != prev_trj:
+            trj = pyloos.Trajectory(trj_name, model, subset=subset_selection)
+        prev_trj = trj_name
+        frame = trj.readFrame(fra_ix)
+        align_vec[sort_ix] = loos.selectAtoms(frame, align_selection)
+        subset_vec[sort_ix] = frame
+        bin_ix = np.searchsorted(starts, sort_ix, side='right') - 1
+        full_inds[sort_ix] = (bin_ix, trj_ix, fra_ix)
 
     return full_inds, subset_vec, align_vec
 
@@ -205,7 +213,7 @@ def align_samples(subset_vec, align_vec):
           alignment_result.iterations, 'iterations')
 
 
-def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs):
+def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs: bool):
     # If out_path is already a path, then this returns it.
     # If out_path is a string, turn it into a pathlib Path object here
     op = Path(out_path)
@@ -379,7 +387,7 @@ if __name__ == '__main__':
 
         else:
             print(args.mapping, 'does not have an extension that implies it is either a pickled msm or a mapping '
-                                'object (.json, .numpy or .pickle). Unsupported format. Exiting.')
+                                'object (.json, .npy or .pickle). Unsupported format. Exiting.')
             exit(2)
 
     if args.features:
