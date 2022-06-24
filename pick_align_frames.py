@@ -190,7 +190,6 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, tra
     prev_trj = None
     # loop over the selected frame indices.
     for sort_ix in sorted_chosen:
-        print(sort_ix, type(sort_ix))
         _, trj_ix, fra_ix = full_inds[sort_ix]
         trj_name = traj_paths[trj_ix]
         if trj_name != prev_trj:
@@ -198,10 +197,12 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, tra
                                     subset=subset_selection)
         prev_trj = trj_name
         trj.readFrame(fra_ix)
+        # For now, np.int64 is not an acceptable index type for AGVecs.
+        retyped_sort_ix = int(sort_ix)
         # readFrame updates ref to the traj's internal AG,
         # so both product AGs need to be copied.
-        align_vec[sort_ix] = align_subset.copy()
-        subset_vec[sort_ix] = subset.copy()
+        align_vec[retyped_sort_ix] = align_subset.copy()
+        subset_vec[retyped_sort_ix] = subset.copy()
 
     return full_inds, subset_vec, align_vec
 
