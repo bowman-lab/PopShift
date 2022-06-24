@@ -195,8 +195,8 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, tra
             trj = pyloos.Trajectory(trj_name, model, subset=subset_selection)
         prev_trj = trj_name
         frame = trj.readFrame(fra_ix)
-        align_vec[sort_ix] = loos.selectAtoms(frame, align_selection)
-        subset_vec[sort_ix] = frame
+        align_vec[sort_ix] = loos.selectAtoms(frame, align_selection).copy()
+        subset_vec[sort_ix] = frame.copy()  # readFrame returns a ref to the traj's internal AG.
         bin_ix = np.searchsorted(starts, sort_ix, side='right') - 1
         full_inds[sort_ix] = (bin_ix, trj_ix, fra_ix)
 
