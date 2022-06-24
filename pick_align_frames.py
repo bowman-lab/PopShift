@@ -193,7 +193,7 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, tra
         _, trj_ix, fra_ix = full_inds[sort_ix]
         trj_name = traj_paths[trj_ix]
         if trj_name != prev_trj:
-            trj = pyloos.Trajectory(trj_name, model, subset=subset_selection)
+            trj = pyloos.Trajectory(str(trj_name), model, subset=subset_selection)
         prev_trj = trj_name
         trj.readFrame(fra_ix)
         # readFrame returns a ref to the traj's internal AG, so both product AGs need to be copied.
