@@ -414,6 +414,8 @@ if __name__ == '__main__':
             traj_paths = p_trjs.read_text().split()
         elif p_trjs.suffix == '.pickle':
             traj_paths.append(unpickle_resave_centers(p_trjs))
+        elif p_trjs.suffix == '.npy':
+           traj_paths = np.load(str(p_trjs))
         else:
             traj_paths.append(p_trjs)
     else:
