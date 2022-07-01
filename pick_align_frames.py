@@ -184,7 +184,7 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, tra
     align_vec = loos.AtomicGroupVector(len(full_inds))
 
     # set up the atomic groups that readFrame will update (they'll be references)
-    frame = loos.selectAtoms(model, subset_selection)
+    subset = loos.selectAtoms(model, subset_selection)
     align_subset = loos.selectAtoms(model, align_selection)
     # track previously read-from traj to see if we need to change which one is open.
     prev_trj = None
@@ -193,12 +193,16 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, tra
         _, trj_ix, fra_ix = full_inds[sort_ix]
         trj_name = traj_paths[trj_ix]
         if trj_name != prev_trj:
-            trj = pyloos.Trajectory(trj_name, model, subset=subset_selection)
+            trj = pyloos.Trajectory(str(trj_name), model,
+                                    subset=subset_selection)
         prev_trj = trj_name
         trj.readFrame(fra_ix)
-        # readFrame returns a ref to the traj's internal AG, so both product AGs need to be copied.
-        align_vec[sort_ix] = align_subset.copy()
-        subset_vec[sort_ix] = frame.copy()
+        # For now, np.int64 is not an acceptable index type for AGVecs.
+        retyped_sort_ix = int(sort_ix)
+        # readFrame updates ref to the traj's internal AG,
+        # so both product AGs need to be copied.
+        align_vec[retyped_sort_ix] = align_subset.copy()
+        subset_vec[retyped_sort_ix] = subset.copy()
 
     return full_inds, subset_vec, align_vec
 
