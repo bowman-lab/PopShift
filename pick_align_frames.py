@@ -419,7 +419,7 @@ if __name__ == '__main__':
         elif p_trjs.suffix == '.pickle':
             traj_paths.append(unpickle_resave_centers(p_trjs))
         elif p_trjs.suffix == '.npy':
-           traj_paths = np.load(str(p_trjs))
+           traj_paths = np.load(str(p_trjs), allow_pickle=True)
         else:
             traj_paths.append(p_trjs)
     else:
