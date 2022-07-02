@@ -19,7 +19,7 @@ def read_clear_find_write_fused(heavy_cut: float, hydro_cut: float, structure: P
         f.write(str(loos.PDB.fromAtomicGroup(s)))
 
 
-p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter())
+p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 p.add_argument('models', nargs='+', type=Path,
                help='Models to add bonds to using cutoffs.')
