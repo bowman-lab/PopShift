@@ -42,3 +42,4 @@ if __name__ == '__main__':
 
     pool = multiprocessing.Pool(args.nprocs)
     pool.map(structure_operator, args.models)
+    pool.close()
