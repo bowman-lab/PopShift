@@ -54,8 +54,15 @@ for dock_run in args.docking_runs:
         result_paths = [sorted((sample_path for sample_path in state_path.rglob('*.pdbqt')),
                                key=lambda x: tuple(map(int, number_pattern.findall(str(x))[-2:])))
                         for state_path in state_paths]
-        r = ra.RaggedArray(pool.map(em, result_paths))
+        extracted_results = pool.map(em, result_paths)
+        for i, result in enumerate(extracted_results):
+            if len(result) != 1:
+                print(result_paths[i], result)
         outpre = out_path/ligand_path.stem
+        print(outpre)
+        r = ra.RaggedArray(extracted_results)
+        print(r)
+        print(np.isnan(r.flatten()))
         ra.save(str(outpre.with_suffix('.h5')), r)
         with outpre.with_suffix('.pickle').open('wb') as f:
             pickle.dump(result_paths, f)
