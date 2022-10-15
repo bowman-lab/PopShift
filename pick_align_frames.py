@@ -163,6 +163,9 @@ def get_frames_using_kmeans(assignments, nstates, features, n_clusters, mapping)
 def get_centers(assigs, nstates, nd, mapping):
     return np.array([[0, i] for i in range(nstates)]).reshape(nstates, 1, 2)
 
+def get_centers_from_centerinds(assigs, nstates, nd, mapping):
+    return np.array(assigs[mapped_state] for mapped_state in mapping)
+
 
 def unpickle_resave_centers(centersfn):
     cens = concatenate_trjs(np.load(centersfn, allow_pickle=True))
@@ -261,6 +264,7 @@ frame_selectors = {
     'random': get_random_per_bin,
     'specified_totals': get_specified_number_per_bin_random,
     'centers': get_centers,
+    'centers_from_inds': get_centers_from_centerinds,
     'kmeans': get_frames_using_kmeans
 }
 
