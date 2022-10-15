@@ -369,17 +369,20 @@ if __name__ == '__main__':
         frame_counts = np.loadtxt(args.total_per_bin, dtype=int)
 
     elif args.assignments:
-        low_inds = np.where(
-            np.bincount(assignments.flatten()) < args.number_frames)
-        if len(low_inds[0]) > 0:
-            print('The(se) bin(s) have fewer than your requested samples in them:')
-            print(low_inds[0])
-            print('You requested this many frames per bin:')
-            print(args.number_frames)
-            print('Exiting.')
-            exit(1)
+        if args.frame_selector == 'centers_from_inds':
+            frame_counts = 1
+        else:
+            low_inds = np.where(
+                np.bincount(assignments.flatten()) < args.number_frames)
+            if len(low_inds[0]) > 0:
+                print('The(se) bin(s) have fewer than your requested samples in them:')
+                print(low_inds[0])
+                print('You requested this many frames per bin:')
+                print(args.number_frames)
+                print('Exiting.')
+                exit(1)
 
-        frame_counts = args.number_frames
+            frame_counts = args.number_frames
     else:  # this is in the event that we have no assignments, and are just pulling centers
         frame_counts = 1
 
