@@ -164,7 +164,9 @@ def get_centers(assigs, nstates, nd, mapping):
     return np.array([[0, i] for i in range(nstates)]).reshape(nstates, 1, 2)
 
 def get_centers_from_centerinds(assigs, nstates, nd, mapping):
-    return np.array(assigs[mapping[mapped_state]] for mapped_state in mapping)
+    cens = np.array(assigs[mapping[mapped_state]] for mapped_state in mapping)
+    print(cens)
+    return cens
 
 
 def unpickle_resave_centers(centersfn):
