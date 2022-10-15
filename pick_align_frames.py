@@ -334,6 +334,8 @@ if __name__ == '__main__':
 
     if args.frame_selector == 'centers':
         assignments = np.arange(eq_probs.shape[0])
+    elif args.frame_selector == 'centers_from_inds':
+        assignments = np.load(args.assignments)
     else:
         assignments = ra.load(args.assignments)
     model = loos.createSystem(args.model)
