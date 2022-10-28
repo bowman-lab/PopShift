@@ -12,7 +12,7 @@ p.add_argument('edge_length_z', type=int, help='Z edge length')
 p.add_argument('-g', '--grid-spacing', type=float, default=1.0,
                help='Grid spacing for autodock-style tools; will be multiplied '
                     'through each edge length.')
-args = p.parse_args('0 0 0 8 8 8'.split())
+args = p.parse_args()
 
 
 box = loos.AtomicGroup()
