@@ -12,7 +12,7 @@ def get_meta_from_path(ligp):
 
 
 p = options.LoosOptions("Read a ligand and a receptor pdb (as from docking); "
-                        "Align and compute RMSD to reference.")
+                        "align and compute RMSD to reference.")
 p.modelSelectionOptions()
 p.add_argument('--all-subset', type=str, default=" && ! hydrogen",
                help='Subset to all selection strings. To disable, provide empty'
