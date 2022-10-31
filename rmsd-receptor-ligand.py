@@ -14,10 +14,10 @@ def get_meta_from_path(ligp):
 
 # right now this only works for SMINA
 def get_ligand_affinity(ligp, search_re=re.compile(r'^REMARK minimizedAffinity')):
-   with ligp.open() as f:
-       for line in f:
-           if search_re.match(line):
-               return line.split(maxplit=4)[2]
+    with ligp.open() as f:
+        for line in f:
+            if search_re.match(line):
+                return line.split(maxsplit=4)[2]
     return None
 
 def purify_expt_multiconf(atomic_group, preferred_loc='A'):
@@ -77,7 +77,7 @@ try:
     args = p.parse_args()
 except:
     for index, argval in enumerate(argv):
-       print(index, argval)
+        print(index, argval)
     raise
 
 subset_str = args.all_subset
@@ -117,43 +117,45 @@ sample_traj = pyloos.VirtualTrajectory(*map(
 if args.debug:
     print('ref_complex', args.ref_complex)
     print('ligname', ref_ligand[0].resname())
-    print('ref_complex size', len(ref_complex))
-    print('samplec size', len(samplec))
-    print('ref_complex_ca size', len(ref_complex_ca))
-    print('samplec_ca size', len(samplec_ca))
+    if len(ref_complex) != len(samplec):
+        print('PROBLEM: ref_complex size:', len(ref_complex), 'samplec size:', len(samplec) )
+    if len(ref_complex_ca) != len(samplec_ca):
+        print('PROBLEM: ref_complex_ca size:', len(ref_complex_ca), 'samplec_ca size:', len(samplec_ca) )
+    if len(ligpose) != len(ref_ligand):
+        print('PROBLEM: ligpose size:', len(ligpose), 'ref_ligand size:', len(ref_ligand) )
     print('ref_ligand size', len(ref_ligand))
     print('pose size', len(ligpose))
+else:
+    for posep, samplep, _, _ in zip(args.poses, args.samples, lig_traj, sample_traj):
+        # superposition computes the transform needed to superimpose atoms from
+        # ref_complex onto atoms from samplec, but does not perform transform
+        xform = loos.XForm(ref_complex.superposition(samplec))
+        # applies to ref_ligand and ref_complex because they stem from this AG
+        ref_complex_full.applyTransform(xform)
+        rmsd_rec = samplec.rmsd(ref_complex)
+        rmsd_ca = samplec_ca.rmsd(ref_complex_ca)
+        rmsd_lig = ligpose.rmsd(ref_ligand)
+        bin_index, sample = get_meta_from_path(posep)
+        if args.extract_score:
+            score = get_ligand_affinity(posep)
+        else:
+            score = None
+        outlist[int(bin_index)][sample] = {
+            'receptor': rmsd_rec,
+            'receptor CA': rmsd_ca,
+            'ligand': rmsd_lig,
+            'score': score
+        }
+        if args.write_complex_prefix:
+            out_ag = ligpose_full + samplec_full + ref_complex_full
+            if args.translate_sel:
+                out_ag = loos.selectAtoms(out_ag, args.translate_sel)
+            pdb = loos.PDB.fromAtomicGroup(out_ag)
+            outpath = posep.parent + args.write_complex_prefix + posep.name
+            with outpath.open('w') as f:
+                f.write(str(pdb))
+            outlist[int(bin_index)][sample]['aligned'] = str(outpath)
 
-for posep, samplep, _, _ in zip(args.poses, args.samples, lig_traj, sample_traj):
-    # superposition computes the transform needed to superimpose atoms from
-    # ref_complex onto atoms from samplec, but does not perform transform
-    xform = loos.XForm(ref_complex.superposition(samplec))
-    # applies to ref_ligand and ref_complex because they stem from this AG
-    ref_complex_full.applyTransform(xform)
-    rmsd_rec = samplec.rmsd(ref_complex)
-    rmsd_ca = samplec_ca.rmsd(ref_complex_ca)
-    rmsd_lig = ligpose.rmsd(ref_ligand)
-    bin_index, sample = get_meta_from_path(posep)
-    if args.extract_score:
-        score = get_ligand_affinity(posep)
-    else:
-        score = None
-    outlist[int(bin_index)][sample] = {
-        'receptor': rmsd_rec,
-        'receptor CA': rmsd_ca,
-        'ligand': rmsd_lig,
-        'score': score
-    }
-    if args.write_complex_prefix:
-        out_ag = ligpose_full + samplec_full + ref_complex_full
-        if args.translate_sel:
-            out_ag = loos.selectAtoms(out_ag, args.translate_sel)
-        pdb = loos.PDB.fromAtomicGroup(out_ag)
-        outpath = posep.parent + args.write_complex_prefix + posep.name
-        with outpath.open('w') as f:
-            f.write(str(pdb))
-        outlist[int(bin_index)][sample]['aligned'] = str(outpath)
 
-
-with args.rmsd_db.open('w') as f:
-    json.dump(outlist, f, indent=4)
+    with args.rmsd_db.open('w') as f:
+        json.dump(outlist, f, indent=4)
