@@ -3,7 +3,8 @@ from pathlib import Path
 import json
 import loos
 from loos import pyloos
-from loos.pyloos import options
+from sys import argv
+import re
 
 def get_meta_from_path(ligp):
     bin_index = ligp.parent.name
@@ -11,12 +12,37 @@ def get_meta_from_path(ligp):
     return bin_index, sample
 
 
-p = options.LoosOptions("Read a ligand and a receptor pdb (as from docking); "
-                        "align and compute RMSD to reference.")
-p.modelSelectionOptions()
+# right now this only works for SMINA
+def get_ligand_affinity(ligp, search_re=re.compile(r'^REMARK minimizedAffinity')):
+   with ligp.open() as f:
+       for line in f:
+           if search_re.match(line):
+               return line.split(maxplit=4)[2]
+    return None
+
+def purify_expt_multiconf(atomic_group, preferred_loc='A'):
+    for i in atomic_group:
+        alt = i.altLoc()
+        if alt != '':
+            if alt != preferred_loc:
+                atomic_group.remove(i)
+
+
+p = argparse.ArgumentParser("Read ligand and a receptor pdbs (as from docking);"
+                            " align and compute RMSD to reference.",
+                            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 p.add_argument('--all-subset', type=str, default=" && ! hydrogen",
                help='Subset to all selection strings. To disable, provide empty'
                     ' string as argument.')
+p.add_argument('--alt-loc-pref', type=str, default='A',
+               help='For experimental structures with alternative conformations'
+                    ' modeled in, remove all but the provided conformer letter.'
+                    ' Usually, if there are multiple confs, they are lettered '
+                    'A and B.')
+p.add_argument('--debug', action=argparse.BooleanOptionalAction,
+               help='Throw to get debugging messages printed (to stdout).')
+p.add_argument('--extract-score', action=argparse.BooleanOptionalAction,
+               help='Throw to add scores to emitted json.')
 p.add_argument('--ligand-sel', type=str, default='all',
                help='Selection to apply to ligand PDBs.')
 p.add_argument('--translate-sel', type=str, default=None,
@@ -30,8 +56,14 @@ p.add_argument('--ref-receptor-sel', '-p', default=None, type=str,
                help='If none provided, use main selection string.')
 p.add_argument('--samples', '-S', type=Path, nargs='+', required=True,
                help='Receptor conformations in order matched to ligand poses.')
+p.add_argument('--pocket-sel', type=str, required=True,
+               help='Selection to align the reference complex onto samples. '
+                    'Should operate on samples, but produce atoms matching '
+                    'those of receptor-sel.')
 p.add_argument('--poses', '-P', type=Path, nargs='+', required=True,
                 help='Ligand poses in order matched to receptor conformations.')
+p.add_argument('sample_model', type=Path,
+               help='A model file that can be used to read the samples.')
 p.add_argument('ref_complex', type=Path,
                help='Reference system that will be aligned onto receptor '
                     'structures and from which the rmsd is computed.')
@@ -41,48 +73,76 @@ p.add_argument('ref_ligand_sel', type=str,
 p.add_argument('rmsd_db', type=Path,
                help='Path to write the list of RMSDs, and optionally paths to '
                     'aligned complexes, to. Will be formatted as JSON.')
-args = p.parse_args()
+try:
+    args = p.parse_args()
+except:
+    for index, argval in enumerate(argv):
+       print(index, argval)
+    raise
 
 subset_str = args.all_subset
-pocket_sel = args.selection + subset_str
+pocket_sel = args.pocket_sel + subset_str
 ligand_sel = args.ligand_sel + subset_str
 if args.ref_receptor_sel:
     ref_receptor_sel = args.ref_receptor_sel + subset_str
-ref_ligand_sel = args.ref_liigand_sel + subset_str
+ref_ligand_sel = args.ref_ligand_sel + subset_str
 
 # simulated ligand and receptor sels
-system = loos.createSystem(args.model)
+system = loos.createSystem(str(args.sample_model))
 pocket = loos.selectAtoms(system, pocket_sel)
 
 # reference sels
-ref_complex_full = loos.createSystem(args.ref_complex)
+ref_complex_full = loos.createSystem(str(args.ref_complex))
 if args.ref_receptor_sel:
     ref_complex = loos.selectAtoms(ref_complex_full, ref_receptor_sel)
+    purify_expt_multiconf(ref_complex, preferred_loc=args.alt_loc_pref)
 else:
     ref_complex = loos.selectAtoms(ref_complex_full, pocket_sel)
+    purify_expt_multiconf(ref_complex, preferred_loc=args.alt_loc_pref)
 
-ref_ligand = loos.selectAtoms(args.ref_ligand_sel,  ref_complex_full)
+ref_complex_ca = loos.selectAtoms(ref_complex, 'name == "CA"')
+ref_ligand = loos.selectAtoms(ref_complex_full, args.ref_ligand_sel)
 # make selections before trajectory loops.
 ligpose_full = loos.createSystem(str(args.poses[0]))
 ligpose = loos.selectAtoms(ligpose_full, ligand_sel)
 samplec_full = loos.createSystem(str(args.samples[0]))
 samplec = loos.selectAtoms(samplec_full, pocket_sel)
+samplec_ca = loos.selectAtoms(samplec, 'name == "CA"')
 outlist = [{} for i in range(len(set(x.parent.name for x in args.poses)))]
 lig_traj = pyloos.VirtualTrajectory(*map(
     lambda fn: pyloos.Trajectory(str(fn), ligpose_full), args.poses))
 sample_traj = pyloos.VirtualTrajectory(*map(
     lambda fn: pyloos.Trajectory(str(fn), samplec_full), args.samples))
 
+if args.debug:
+    print('ref_complex', args.ref_complex)
+    print('ligname', ref_ligand[0].resname())
+    print('ref_complex size', len(ref_complex))
+    print('samplec size', len(samplec))
+    print('ref_complex_ca size', len(ref_complex_ca))
+    print('samplec_ca size', len(samplec_ca))
+    print('ref_ligand size', len(ref_ligand))
+    print('pose size', len(ligpose))
+
 for posep, samplep, _, _ in zip(args.poses, args.samples, lig_traj, sample_traj):
-    xform = ref_complex.alignOnto(samplec)
+    # superposition computes the transform needed to superimpose atoms from
+    # ref_complex onto atoms from samplec, but does not perform transform
+    xform = loos.XForm(ref_complex.superposition(samplec))
     # applies to ref_ligand and ref_complex because they stem from this AG
     ref_complex_full.applyTransform(xform)
     rmsd_rec = samplec.rmsd(ref_complex)
+    rmsd_ca = samplec_ca.rmsd(ref_complex_ca)
     rmsd_lig = ligpose.rmsd(ref_ligand)
     bin_index, sample = get_meta_from_path(posep)
+    if args.extract_score:
+        score = get_ligand_affinity(posep)
+    else:
+        score = None
     outlist[int(bin_index)][sample] = {
         'receptor': rmsd_rec,
+        'receptor CA': rmsd_ca,
         'ligand': rmsd_lig,
+        'score': score
     }
     if args.write_complex_prefix:
         out_ag = ligpose_full + samplec_full + ref_complex_full
@@ -96,4 +156,4 @@ for posep, samplep, _, _ in zip(args.poses, args.samples, lig_traj, sample_traj)
 
 
 with args.rmsd_db.open('w') as f:
-    json.dump(outlist, f)
+    json.dump(outlist, f, indent=4)
