@@ -28,6 +28,29 @@ def purify_expt_multiconf(atomic_group, preferred_loc='A'):
                 atomic_group.remove(i)
 
 
+def reductively_unify_ags(groupA, groupB):
+    splitA = groupA.splitByResidue()
+    splitB = groupB.splitByResidue()
+    retgp = loos.AtomicGroup()
+    if len(splitA) != len(splitB):
+        print('Groups do not have the same number of atoms')
+        raise IndexError
+    for resA, resB in zip(splitA, splitB):
+        lena = len(resA)
+        lenb = len(resB)
+        if lena == lenb:
+            continue
+        elif lena > lenb:
+            bigres = resA
+            smallres = resB
+        else:
+            bigres = resB
+            smallres = resA
+        for i, at in enumerate(smallres):
+            retgp += loos.selectAtoms(bigres, 'name == "{}" '.format(at.name))
+    return retgp
+
+
 p = argparse.ArgumentParser("Read ligand and a receptor pdbs (as from docking);"
                             " align and compute RMSD to reference.",
                             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -91,23 +114,24 @@ ref_ligand_sel = args.ref_ligand_sel + subset_str
 system = loos.createSystem(str(args.sample_model))
 pocket = loos.selectAtoms(system, pocket_sel)
 
-# reference sels
-ref_complex_full = loos.createSystem(str(args.ref_complex))
-if args.ref_receptor_sel:
-    ref_complex = loos.selectAtoms(ref_complex_full, ref_receptor_sel)
-    purify_expt_multiconf(ref_complex, preferred_loc=args.alt_loc_pref)
-else:
-    ref_complex = loos.selectAtoms(ref_complex_full, pocket_sel)
-    purify_expt_multiconf(ref_complex, preferred_loc=args.alt_loc_pref)
-
-ref_complex_ca = loos.selectAtoms(ref_complex, 'name == "CA"')
-ref_ligand = loos.selectAtoms(ref_complex_full, args.ref_ligand_sel)
 # make selections before trajectory loops.
 ligpose_full = loos.createSystem(str(args.poses[0]))
 ligpose = loos.selectAtoms(ligpose_full, ligand_sel)
 samplec_full = loos.createSystem(str(args.samples[0]))
 samplec = loos.selectAtoms(samplec_full, pocket_sel)
 samplec_ca = loos.selectAtoms(samplec, 'name == "CA"')
+# reference sels
+ref_complex_full = loos.createSystem(str(args.ref_complex))
+if args.ref_receptor_sel:
+    ref_complex = loos.selectAtoms(ref_complex_full, ref_receptor_sel)
+else:
+    ref_complex = loos.selectAtoms(ref_complex_full, pocket_sel)
+
+purify_expt_multiconf(ref_complex, preferred_loc=args.alt_loc_pref)
+samplec = reductively_unify_ags(samplec, ref_complex)
+ref_complex_ca = loos.selectAtoms(ref_complex, 'name == "CA"')
+ref_ligand = loos.selectAtoms(ref_complex_full, args.ref_ligand_sel)
+
 outlist = [{} for i in range(len(set(x.parent.name for x in args.poses)))]
 lig_traj = pyloos.VirtualTrajectory(*map(
     lambda fn: pyloos.Trajectory(str(fn), ligpose_full), args.poses))
