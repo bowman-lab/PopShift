@@ -17,37 +17,33 @@ def get_ligand_affinity(ligp, search_re=re.compile(r'^REMARK minimizedAffinity')
     with ligp.open() as f:
         for line in f:
             if search_re.match(line):
-                return line.split(maxsplit=4)[2]
+                return float(line.split(maxsplit=4)[2])
     return None
 
 def purify_expt_multiconf(atomic_group, preferred_loc='A'):
     for i in atomic_group:
         alt = i.altLoc()
+        # residues that have no alternative confs will have altLoc() == ''
         if alt != '':
             if alt != preferred_loc:
                 atomic_group.remove(i)
 
 
-def reductively_unify_ags(groupA, groupB):
-    splitA = groupA.splitByResidue()
-    splitB = groupB.splitByResidue()
+# this expects that the expt_ag is SMALLER than, but has the same number of
+# residues as, the sample_ag. It makes a new AtomicGroup that, per residue,
+# is composed of pAtoms from sample_ag that have the same names as those in
+# expt_ag. This can fix some problems with comparing to experimental structures,
+# but its behaviour should be checked. Adult supervision required.
+def reductively_unify_ags(sample_ag, expt_ag):
+    sample_split = sample_ag.splitByResidue()
+    expt_split = expt_ag.splitByResidue()
     retgp = loos.AtomicGroup()
-    if len(splitA) != len(splitB):
-        print('Groups do not have the same number of atoms')
+    if len(sample_split) != len(expt_split):
+        print('Groups do not have the same number of residues.')
         raise IndexError
-    for resA, resB in zip(splitA, splitB):
-        lena = len(resA)
-        lenb = len(resB)
-        if lena == lenb:
-            continue
-        elif lena > lenb:
-            bigres = resA
-            smallres = resB
-        else:
-            bigres = resB
-            smallres = resA
-        for i, at in enumerate(smallres):
-            retgp += loos.selectAtoms(bigres, 'name == "{}" '.format(at.name))
+    for sample_res, expt_res in zip(sample_split, expt_split):
+        for at in expt_res:
+            retgp += loos.selectAtoms(sample_res, 'name == "{}" '.format(at.name()))
     return retgp
 
 
@@ -122,15 +118,15 @@ samplec = loos.selectAtoms(samplec_full, pocket_sel)
 samplec_ca = loos.selectAtoms(samplec, 'name == "CA"')
 # reference sels
 ref_complex_full = loos.createSystem(str(args.ref_complex))
+purify_expt_multiconf(ref_complex_full, preferred_loc=args.alt_loc_pref)
 if args.ref_receptor_sel:
     ref_complex = loos.selectAtoms(ref_complex_full, ref_receptor_sel)
 else:
     ref_complex = loos.selectAtoms(ref_complex_full, pocket_sel)
 
-purify_expt_multiconf(ref_complex, preferred_loc=args.alt_loc_pref)
 samplec = reductively_unify_ags(samplec, ref_complex)
 ref_complex_ca = loos.selectAtoms(ref_complex, 'name == "CA"')
-ref_ligand = loos.selectAtoms(ref_complex_full, args.ref_ligand_sel)
+ref_ligand = loos.selectAtoms(ref_complex_full, ref_ligand_sel)
 
 outlist = [{} for i in range(len(set(x.parent.name for x in args.poses)))]
 lig_traj = pyloos.VirtualTrajectory(*map(
@@ -142,11 +138,11 @@ if args.debug:
     print('ref_complex', args.ref_complex)
     print('ligname', ref_ligand[0].resname())
     if len(ref_complex) != len(samplec):
-        print('PROBLEM: ref_complex size:', len(ref_complex), 'samplec size:', len(samplec) )
+        print('PROBLEM: ref_complex size:', len(ref_complex), 'samplec size:', len(samplec))
     if len(ref_complex_ca) != len(samplec_ca):
-        print('PROBLEM: ref_complex_ca size:', len(ref_complex_ca), 'samplec_ca size:', len(samplec_ca) )
+        print('PROBLEM: ref_complex_ca size:', len(ref_complex_ca), 'samplec_ca size:', len(samplec_ca))
     if len(ligpose) != len(ref_ligand):
-        print('PROBLEM: ligpose size:', len(ligpose), 'ref_ligand size:', len(ref_ligand) )
+        print('PROBLEM: ligpose size:', len(ligpose), 'ref_ligand size:', len(ref_ligand))
     print('ref_ligand size', len(ref_ligand))
     print('pose size', len(ligpose))
 else:
@@ -179,7 +175,6 @@ else:
             with outpath.open('w') as f:
                 f.write(str(pdb))
             outlist[int(bin_index)][sample]['aligned'] = str(outpath)
-
 
     with args.rmsd_db.open('w') as f:
         json.dump(outlist, f, indent=4)
