@@ -106,10 +106,6 @@ if args.ref_receptor_sel:
     ref_receptor_sel = args.ref_receptor_sel + subset_str
 ref_ligand_sel = args.ref_ligand_sel + subset_str
 
-# simulated ligand and receptor sels
-system = loos.createSystem(str(args.sample_model))
-pocket = loos.selectAtoms(system, pocket_sel)
-
 # make selections before trajectory loops.
 ligpose_full = loos.createSystem(str(args.poses[0]))
 ligpose = loos.selectAtoms(ligpose_full, ligand_sel)
