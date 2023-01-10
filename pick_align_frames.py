@@ -393,7 +393,10 @@ if __name__ == '__main__':
     mapping = None
     if args.mapping:
         if args.mapping.suffix == '.json':
-            mapping = json.load(args.mapping.open())
+            strmapping = json.load(args.mapping.open())
+            mapping = {}
+            for k, v in strmapping.items():
+                mapping[int(k)] = v
         elif args.mapping.suffix == '.npy':
             mapping = np.load(args.mapping, allow_pickle=True).item().mapping_.to_mapped
         elif args.mapping.suffix == '.pickle':
