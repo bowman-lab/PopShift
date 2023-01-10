@@ -78,9 +78,7 @@ parser.add_argument('--result-type', '-t', choices=extract_types.keys(), default
 parser.add_argument('--extract-to', type=Path, default=None,
                     help='If provided, write extracted scores to this directory instead of customary one.')
 
-testargs = "-n 12 --centers --replicas --extract-to test " \
-           "/media/st1/t4-lysozyme/dock/replica1_4000centers_python_scripting".split()
-args = parser.parse_args(testargs)
+args = parser.parse_args()
 pool = mp.Pool(args.nprocs)
 extractor = extract_types[args.result_type]
 if args.centers_tag:
