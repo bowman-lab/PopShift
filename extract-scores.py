@@ -119,8 +119,8 @@ for dock_run in args.docking_runs:
                     pickle.dump(result_paths, f)
         else:
             if args.centers or args.centers_tag:
-                result_paths = sorted((state_path for state_path in ligand_path.rglob('*.pdbqt')),
-                                      key=rip_last_number)
+                result_paths = sorted((state_path for state_path in ligand_path.glob('*.pdbqt')),
+                                      key=result_sorter)
             else:
                 state_paths = sorted((state_path for state_path in ligand_path.iterdir()),
                                      key=lambda x: int(x.stem))
