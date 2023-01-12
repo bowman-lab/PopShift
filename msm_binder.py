@@ -156,6 +156,10 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, ou
     }
 
 
+def repack_as_dict(tuple_packed_results):
+    return {key: value for key, value in tuple_packed_results}
+
+
 def interp_trj_samples_worker_index_from_file(rt, assignments, active_states, eq_probs, mapping, stride, kd_scale,
                                               reweighted_eq, outpath, binding_run):
     tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
@@ -210,7 +214,7 @@ def interp_trj_samples(args, rt):
 
     packed_results = pool.map(br_op, args.binding_fes)
     pool.close()
-    return packed_results
+    return repack_as_dict(packed_results)
 
 
 def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq, outpath, binding_run):
@@ -228,7 +232,10 @@ def interp_bin_samples(args, rt):
     br_op = partial(interp_bin_samples_worker, rt, args.eq_probs, args.K_D_scale, args.reweighted_eq, args.out)
     packed_results = pool.map(br_op, args.binding_fes_h5s)
     pool.close()
-    return packed_results
+    return repack_as_dict(packed_results)
+
+
+
 
 
 
@@ -313,18 +320,43 @@ def run_cli(raw_args=None):
     else:
         binding_output = {}
 
+    if 'log' not in binding_output.keys():
+        binding_output['log'] = {}
+    log = binding_output['log']
     try:
-        binding_output['command line'].append(argv)
+        log['command line'].append(argv)
     except KeyError:
-        binding_output['command line'] = []
-        binding_output['command line'].append(argv)
+        log['command line'] = []
+        log['command line'].append(argv)
 
-    binding_output['log'] = {}
-    binding_output['log']['rt'] = rt
-
-    packed_results = args.func(args, rt)
-    for tag, result in packed_results:
-        binding_output[tag] = result
+    log['rt'] = rt
+    binding_output['log'] = log
+    # get results from this set of input
+    new_results = args.func(args, rt)
+    try:
+        # will trigger except if binding_output doesn't already have results
+        results = binding_output['results']
+        # merge the dictionaries, making ligands
+        # that share a key lists in order of appended dataset
+        for ligand_name, result in results:
+            try:
+                # Cover the case where the ligand in new results is already in 'results'
+                new_result = new_results[ligand_name]
+                # if the value is already a list, append
+                if isinstance(result, list):
+                   result.append(new_result)
+                # if not, start a list with result and new result in that order.
+                else:
+                    results[ligand_name] = [result, new_result]
+            except KeyError:
+                pass
+        # Cover the case where the ligand in new results is not already in results
+        for new_ligand, new_result in new_results.items():
+            if new_ligand not in results.keys():
+                results[new_ligand] = new_result
+        binding_output['results'] = results
+    except KeyError:  # do this if binding_output doesn't have any results yet
+        binding_output['results'] = new_results
 
     with open(out_binding_path, 'w') as f:
         json.dump(binding_output, f, indent=4)

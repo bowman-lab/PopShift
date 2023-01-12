@@ -15,10 +15,7 @@ def extract_score_from_vina_pdbqt(*pdbqts, search_re=re.compile(r'^REMARK VINA R
                 if search_re.match(line):
                     outlist.append(float(line.split(maxsplit=4)[3]))
                     break
-    if len(outlist) == 1:
-        return outlist[0]
-    else:
-        return np.array(outlist, dtype='f4')
+    return np.array(outlist, dtype='f4')
 
 
 def extract_score_from_smina_pdbqt(*pdbqts, search_re=re.compile(r'^REMARK minimizedAffinity')):
@@ -29,10 +26,7 @@ def extract_score_from_smina_pdbqt(*pdbqts, search_re=re.compile(r'^REMARK minim
                 if search_re.match(line):
                     outlist.append(float(line.split(maxsplit=4)[2]))
                     break
-    if len(outlist) == 1:
-        return outlist[0]
-    else:
-        return np.array(outlist, dtype='f4')
+    return np.array(outlist, dtype='f4')
 
 
 number_pattern = re.compile('\d+')
@@ -116,7 +110,9 @@ for dock_run in args.docking_runs:
                                            key=result_sorter)
                                     for state_path in state_paths]
                 extracted_results = pool.map(extractor, result_paths)
-                outpre = out_path / (ligand_path.stem + f'-{rep_ix}')
+                rep_dir = out_path / rep_path.stem
+                rep_dir.mkdir(exist_ok=True, parents=True)
+                outpre = rep_dir / ligand_path.stem
                 r = ra.RaggedArray(extracted_results)
                 ra.save(str(outpre.with_suffix('.h5')), r)
                 with outpre.with_suffix('.pickle').open('wb') as f:
