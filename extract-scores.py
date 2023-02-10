@@ -7,7 +7,7 @@ from pathlib import Path
 import pickle
 
 
-def extract_score_from_vina_pdbqt(*pdbqts, search_re=re.compile(r'^REMARK VINA RESULT')):
+def extract_score_from_vina_pdbqt(pdbqts, search_re=re.compile(r'^REMARK VINA RESULT')):
     outlist = []
     for pdbqt in pdbqts:
         with pdbqt.open() as f:
@@ -18,8 +18,9 @@ def extract_score_from_vina_pdbqt(*pdbqts, search_re=re.compile(r'^REMARK VINA R
     return np.array(outlist, dtype='f4')
 
 
-def extract_score_from_smina_pdbqt(*pdbqts, search_re=re.compile(r'^REMARK minimizedAffinity')):
+def extract_score_from_smina_pdbqt(pdbqts, search_re=re.compile(r'^REMARK minimizedAffinity')):
     outlist = []
+    # print(pdbqts)
     for pdbqt in pdbqts:
         with pdbqt.open() as f:
             for line in f:
@@ -72,6 +73,8 @@ parser.add_argument('--result-type', '-t', choices=extract_types.keys(), default
 parser.add_argument('--extract-to', type=Path, default=None,
                     help='If provided, write extracted scores to this directory instead of customary one.')
 
+# test_args = '-n 12 -t smina /home/louis/binding/t4l/redock-replicas/replica1/10xsmina'.split()
+# args = parser.parse_args(test_args)
 args = parser.parse_args()
 pool = mp.Pool(args.nprocs)
 extractor = extract_types[args.result_type]
@@ -101,7 +104,7 @@ for dock_run in args.docking_runs:
             for rep_path in rep_paths:
                 rep_ix = rip_last_number(rep_path)
                 if args.centers or args.centers_tag:
-                    result_paths = sorted((sample_path for sample_path in rep_path.rglob('*.pdbqt')),
+                    result_paths = sorted((sample_path for sample_path in rep_path.glob('*.pdbqt')),
                                           key=result_sorter)
                 else:
                     state_paths = sorted((state_path for state_path in rep_path.iterdir()),
@@ -119,14 +122,14 @@ for dock_run in args.docking_runs:
                     pickle.dump(result_paths, f)
         else:
             if args.centers or args.centers_tag:
-                result_paths = sorted((state_path for state_path in ligand_path.glob('*.pdbqt')),
+                result_paths = sorted(([state_path] for state_path in ligand_path.glob('*.pdbqt')),
                                       key=result_sorter)
             else:
                 state_paths = sorted((state_path for state_path in ligand_path.iterdir()),
                                      key=lambda x: int(x.stem))
-                result_paths = [sorted((sample_path for sample_path in state_path.rglob('*.pdbqt')),
+                result_paths = [sorted((sample_path for sample_path in state_path.glob('*.pdbqt')),
                                        key=result_sorter)
-                                for state_path in state_path]
+                                for state_path in state_paths]
             extracted_results = pool.map(extractor, result_paths)
             for i, result in enumerate(extracted_results):
                 if len(result) != 1:
