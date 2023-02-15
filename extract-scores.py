@@ -135,7 +135,8 @@ for dock_run in args.docking_runs:
                 if len(result) != 1:
                     print(result_paths[i], result)
             outpre = out_path / ligand_path.stem
-            r = ra.RaggedArray(extracted_results)
+            # Need to disable error checking in order to avoid a version bug issue.
+            r = ra.RaggedArray(extracted_results, error_checking=False)
             ra.save(str(outpre.with_suffix('.h5')), r)
             with outpre.with_suffix('.pickle').open('wb') as f:
                 pickle.dump(result_paths, f)
