@@ -72,8 +72,8 @@ def filter_frame_weights(msm_obj, stride, state_counts, ra_assigns, active_state
 # returns RaggedArray of eq_prob per bin divided by number of samples drawn from that bin.
 def expand_bin_weights(eq_probs, lengths):
     return ra.RaggedArray(
-        [[p for p in repeat(eq_probs[i]/length, length)]
-         for i, length in enumerate(lengths)]
+        [p for i, length in enumerate(lengths) for p in repeat(eq_probs[i]/length, length)],
+        lengths=lengths
     )
 
 
