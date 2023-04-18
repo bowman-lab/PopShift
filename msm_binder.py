@@ -98,8 +98,8 @@ def count_strided_states(ra_assigns, stride, active_states):
 
 
 # compute reweightings.
-def reweighted_frames(frame_weights, kas):
-    unnormed_weights = frame_weights * (1 + kas)
+def reweighted_frames(frame_weights, kas, conc_ligand=1):
+    unnormed_weights = frame_weights * (1 + kas * conc_ligand)
     return unnormed_weights / np.sum(unnormed_weights)
 
 
