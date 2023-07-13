@@ -73,8 +73,6 @@ parser.add_argument('--result-type', '-t', choices=extract_types.keys(), default
 parser.add_argument('--extract-to', type=Path, default=None,
                     help='If provided, write extracted scores to this directory instead of customary one.')
 
-# test_args = '-n 12 -t smina /home/louis/binding/t4l/redock-replicas/replica1/10xsmina'.split()
-# args = parser.parse_args(test_args)
 args = parser.parse_args()
 pool = mp.Pool(args.nprocs)
 extractor = extract_types[args.result_type]

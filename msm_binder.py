@@ -5,10 +5,8 @@ from enspara import ra
 from enspara import msm
 from pathlib import Path
 import json
-# import stdout to dump json, import argv to save command line
-from sys import stdout, argv
+from sys import argv
 from itertools import repeat
-# import pyemma.coordinates as coor  # note this is done below only in the case where it's needed.
 
 import argparse
 

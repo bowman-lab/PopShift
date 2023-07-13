@@ -1,4 +1,4 @@
-from jug import TaskGenerator, Task
+from jug import TaskGenerator
 from vina import Vina
 import argparse
 import subprocess as sp
