@@ -1,11 +1,25 @@
-
+"""
 #########################################################################################################
 ## This script prepares both ligand and protein files for docking by using ADFR suite scripts.         ##
 ## It uses multiprocessing to speed up the prep time.                                                  ##
 ## It also aligns protein structures if needed, using user provided atoms in -a                        ##
 #########################################################################################################
+    Copyright (C) 2023 Borna Novak
 
-# * Fixed BUG by not using map: seems to convert all the ligands to a random ligand with different charges in each mol2 file - antechamber
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+"""
 
 import os
 import subprocess as sp

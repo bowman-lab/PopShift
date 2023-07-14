@@ -1,3 +1,22 @@
+"""
+Picks frames from a collection of trajectories that were used to make an
+MSM, then iteratively aligns them using a user provided subset of atoms.
+    Copyright (C) 2023 Louis G. Smith and Borna Novak
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+"""
 import argparse
 from pathlib import Path
 import numpy as np
@@ -17,8 +36,7 @@ def floatpair(s, delim=','):
         start_ind, end_ind = map(float, s.split(delim))
         return start_ind, end_ind
     except:
-        raise argparse.ArgumentTypeError(
-            'Float pairs must be specified as "decimal.one,decimal.two"')
+        raise argparse.ArgumentTypeError('Float pairs must be specified as "decimal.one,decimal.two"')
 
 
 def get_assigns_no_map_no_unbox(assignments, nstates):
@@ -77,26 +95,21 @@ def get_assign_inds(assignments, nstates, mapping=None):
     # meaning the ragged array doesn't have singleton elements at the tightest level.
     if len(assignments.shape) == 1:
         if mapping:
-            index_list_by_bin = get_assigns_map_no_unbox(
-                assignments, nstates, mapping)
+            index_list_by_bin = get_assigns_map_no_unbox(assignments, nstates, mapping)
         else:
-            index_list_by_bin = get_assigns_no_map_no_unbox(
-                assignments, nstates)
+            index_list_by_bin = get_assigns_no_map_no_unbox(assignments, nstates)
     # Handle the case where the last element in the shape of the RA is 1 (when it should be 'None').
     # This is interpreted as having singleton elements at the tightest level, and thus unboxing them.
     elif assignments.shape[-1] == 1:
         if mapping:
-            index_list_by_bin = get_assigns_map_unbox(
-                assignments, nstates, mapping)
+            index_list_by_bin = get_assigns_map_unbox(assignments, nstates, mapping)
         else:
             index_list_by_bin = get_assigns_no_map_unbox(assignments, nstates)
     else:  # operate on a normal 2-ragged array.
         if mapping:
-            index_list_by_bin = get_assigns_map_no_unbox(
-                assignments, nstates, mapping)
+            index_list_by_bin = get_assigns_map_no_unbox(assignments, nstates, mapping)
         else:
-            index_list_by_bin = get_assigns_no_map_no_unbox(
-                assignments, nstates)
+            index_list_by_bin = get_assigns_no_map_no_unbox(assignments, nstates)
     return [np.array(bin_indices, dtype=[('traj', np.int32), ('frame', np.int32)]) for bin_indices in index_list_by_bin]
 
 
@@ -117,8 +130,7 @@ def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, m
 
 
 def calc_euclidean_distance(reference, other_frames_in_the_bin):
-    distances = [euclidean(reference, other_frames_in_the_bin[num])
-                 for num in range(len(other_frames_in_the_bin))]
+    distances = [euclidean(reference, other_frames_in_the_bin[num]) for num in range(len(other_frames_in_the_bin))]
     return distances
 
 
@@ -141,25 +153,20 @@ def kmeans_cluster(features, n_clusters):
 def find_closest_frame(cluster_centers, features, indices):
     all_indices = []
     for num, bin in enumerate(cluster_centers):
-        distances = [calc_euclidean_distance(
-            frame, features[num]) for frame in bin]
+        distances = [calc_euclidean_distance(frame, features[num]) for frame in bin]
         min_distance = [np.min(dist) for dist in
                         distances]  # ! Not sure if i want/need this, might be interesting to print out
-        min_distance_loc = [np.where(dist == np.min(dist))
-                            for dist in distances]
+        min_distance_loc = [np.where(dist == np.min(dist)) for dist in distances]
         if len(min_distance_loc[0]) > 1:
-            min_distance_loc = np.random.default_rng().choice(
-                min_distance_loc[0], 1, axis=0, replace=False)[0]
-        frames_to_extract = [indices[num][min_distance_loc[i][0]]
-                             for i in range(len(min_distance_loc))]
+            min_distance_loc = np.random.default_rng().choice(min_distance_loc[0], 1, axis=0, replace=False)[0]
+        frames_to_extract = [indices[num][min_distance_loc[i][0]] for i in range(len(min_distance_loc))]
         all_indices.append(frames_to_extract)
     return all_indices
 
 
 def get_frames_using_kmeans(assignments, nstates, features, n_clusters, mapping):
     print('Mapping features to bins')
-    mapped_features, all_state_indices = map_features(
-        assignments, nstates, mapping, features)
+    mapped_features, all_state_indices = map_features(assignments, nstates, mapping, features)
     print('KMeans clustering of the frames within bins using features provided')
     # ! This line seems slow for some reason (not slow in my jupyter nb)
     cluster_centers = [kmeans_cluster(bin_features, number) for bin_features, number in zip(mapped_features,
@@ -175,10 +182,8 @@ def get_frames_using_kmeans(assignments, nstates, features, n_clusters, mapping)
 def get_centers(assigs, nstates, nd, mapping):
     return np.array([[0, i] for i in range(nstates)]).reshape(nstates, 1, 2)
 
-
 def get_centers_from_centerinds(assigs, nstates, nd, mapping):
-    cens = np.array([[assigs[mapping[mapped_state]]]
-                    for mapped_state in mapping])
+    cens = np.array([[assigs[mapping[mapped_state]]] for mapped_state in mapping])
     print(cens)
     return cens
 
@@ -276,6 +281,7 @@ def pyemma_mapping(msm_obj):
     return mapping
 
 
+
 if __name__ == '__main__':
     frame_selectors = {
         'random': get_random_per_bin,
@@ -297,38 +303,38 @@ if __name__ == '__main__':
                         help='Strategy for selecting frames to represent each MSM bin.')
     parser.add_argument('align_selection', type=str,
                         help='A file containing a loos selection string to align the selected frames with. Alternatively '
-                        'provide a selection string on the command line.')
+                            'provide a selection string on the command line.')
     parser.add_argument('traj_paths', type=str, nargs='+',
                         help='A file containing a list of trajectories corresponding (in matching order) to the supplied '
-                        'assignments file. Alternatively, paths to the trajectory files.')
+                            'assignments file. Alternatively, paths to the trajectory files.')
     # Optional args below here
     parser.add_argument('--align-resid-list', type=str, default=None,
                         help='If provided, use numbers in file as a list of residue IDs. Concatenate align selection string '
-                        'with one selecting these resids.')
+                            'with one selecting these resids.')
     parser.add_argument('--assignments', type=str, default=None,
                         help='h5 file with assignments from which MSM was built. Obligatory unless using "centers" selector.')
     parser.add_argument('--clear-bonds', action=argparse.BooleanOptionalAction,
                         help='If thrown, remove connectivity information from model. If incorrect bonds present, but bonds'
-                        ' are needed, use this in conjunction with "--find-bonds" to first clear old bonds then assign'
-                        ' new ones.')
+                            ' are needed, use this in conjunction with "--find-bonds" to first clear old bonds then assign'
+                            ' new ones.')
     parser.add_argument('--find-bonds', type=floatpair, default=None,
                         help='If no bonds (CONECT records in PDB) are provided in model, find bonds using these cutoffs.')
     parser.add_argument('--make-receptor-sel-chain-A', action=argparse.BooleanOptionalAction, default=True,
                         help='If thrown, make all atoms a member of chain "A" when writing PDBs.')
     parser.add_argument('--mapping', '-m', type=Path, default=None,
                         help='Use a supplied path to a mapping or MSM to handle eq_probs that have been reduced '
-                        'relative to the number of clusters in assignments (4x, with ergodic trimming). If not'
-                        ' supplying an enspara MSM, mapping should be a .json of a dict providing the "to_mapped" '
-                        'trim mapping.')
+                            'relative to the number of clusters in assignments (4x, with ergodic trimming). If not'
+                            ' supplying an enspara MSM, mapping should be a .json of a dict providing the "to_mapped" '
+                            'trim mapping.')
     parser.add_argument('--number-frames', default=10, type=int,
                         help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
-                        'an error is thrown.')
+                            'an error is thrown.')
     parser.add_argument('--subset-selection', type=str, default='all',
                         help='A loos selection string to subset all frames by (for example, if water is present it could be'
-                        ' stripped here).')
+                            ' stripped here).')
     parser.add_argument('--total-per-bin', default=None, type=str,
                         help='Text file with totals to draw from each MSM bin. Should be one column of totals, '
-                        'where the row index corresponds to the bin and the entry is the number of frames to draw.')
+                            'where the row index corresponds to the bin and the entry is the number of frames to draw.')
     parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
                         help='If thrown, write a DCD with the selected frames in each bin directory.')
     parser.add_argument('--write-bin-dtraj', type=Path, default=None,
@@ -344,8 +350,7 @@ if __name__ == '__main__':
             eq_probs = np.load(args.eq_probs)
         except ValueError:
             try:
-                eq_probs = np.load(
-                    args.eq_probs, allow_pickle=True).item().eq_probs_
+                eq_probs = np.load(args.eq_probs, allow_pickle=True).item().eq_probs_
             except AttributeError:
                 with open(args.eq_probs, 'rb') as f:
                     eq_probs = pickle.load(f).pi
@@ -366,7 +371,7 @@ if __name__ == '__main__':
             print('Bond specifiers not found in model file.')
             if args.find_bonds:
                 print('Defining bonds using distance cutoffs; ', args.find_bonds[0], 'angstrom for heavy atoms, and ',
-                      args.find_bonds[1], 'angstroms for hydrogens.')
+                    args.find_bonds[1], 'angstroms for hydrogens.')
                 model = add_bonds_two_cuts(model, *args.find_bonds)
         # AutoDock usually needs this to produce working parameterizations.
         if args.make_receptor_sel_chain_A:
@@ -375,14 +380,12 @@ if __name__ == '__main__':
         align_sel = ''
         if args.align_resid_list:
             alresids = np.genfromtxt(args.align_resid_list).astype(int)
-            align_sel += ' || '.join(['resid == {}'.format(i)
-                                     for i in alresids]) + " &&"
+            align_sel += ' || '.join(['resid == {}'.format(i) for i in alresids]) + " &&"
 
         # if filename is provided read its contents to obtain align string
         try:
             align_sel += " (" + Path(args.align_selection).read_text() + ")"
-        # if the string is not a file name, interpret it as a loos selection string.
-        except FileNotFoundError:
+        except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
             align_sel += " (" + args.align_selection + ")"
 
         # get frame counts, however it's prescribed
@@ -397,8 +400,7 @@ if __name__ == '__main__':
                 low_inds = np.where(
                     np.bincount(assignments.flatten()) < args.number_frames)
                 if len(low_inds[0]) > 0:
-                    print(
-                        'The(se) bin(s) have fewer than your requested samples in them:')
+                    print('The(se) bin(s) have fewer than your requested samples in them:')
                     print(low_inds[0])
                     print('You requested this many frames per bin:')
                     print(args.number_frames)
@@ -417,8 +419,7 @@ if __name__ == '__main__':
                 for k, v in strmapping.items():
                     mapping[int(k)] = v
             elif args.mapping.suffix == '.npy':
-                mapping = np.load(
-                    args.mapping, allow_pickle=True).item().mapping_.to_mapped
+                mapping = np.load(args.mapping, allow_pickle=True).item().mapping_.to_mapped
             elif args.mapping.suffix == '.pickle':
                 msm = np.load(args.mapping, allow_pickle=True)
                 mapping = pyemma_mapping(msm)
@@ -466,7 +467,6 @@ if __name__ == '__main__':
             chosen_frames, model, args.subset_selection, align_sel, traj_paths
         )
         align_samples(subset_vec, align_vec)
-        write_sampled_frames(subset_vec, full_inds,
-                             out_path, args.write_bin_trajs)
+        write_sampled_frames(subset_vec, full_inds, out_path, args.write_bin_trajs)
         if args.write_bin_dtraj:
             ra.save(args.write_bin_dtraj, chosen_frames)
