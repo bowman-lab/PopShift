@@ -160,7 +160,7 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, ou
     if reweighted_eq:
         # convert trimmed Free energies to association constants
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
-        reweights = reweighted_frames(frame_weights, kas)
+        reweights = reweighted_frames(frame_weights, kas, conc_ligand=reweighted_eq)
         fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
         ra.save(str(outpath/(tag+'-fe.h5')),
                 ra.RaggedArray(fe_per_state, lengths=lengths))
@@ -297,8 +297,8 @@ def run_cli(raw_args=None):
     parser.add_argument('--K_D-scale', type=float, default=10 ** 6,
                         help='Scale dissoc. constant by this value to put entry in more customary range. '
                              'Default converts to micromolar.')
-    parser.add_argument('--reweighted-eq', action=argparse.BooleanOptionalAction, default=True,
-                        help='If thrown, computes and writes reweighted equilibrium probabilities in out-dir.')
+    parser.add_argument('--reweighted-eq', type=float, default=0,
+                        help='If a concentration is provided, computes and writes reweighted equilibrium probabilities in out-dir.')
 
     trj_parser = subparsers.add_parser('traj-samples', help='Use a sequence of docked frames. '
                                                             'Use assigns and MSM to map these scores to MSM bins '
