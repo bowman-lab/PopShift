@@ -38,7 +38,7 @@ def parse_indexed_fe_file(filename, stride=1):
     # include stride at this point. This could lead to errors if operator
     # 'strides' both when recording indexed scores and also when calling this tool.
     return (np.array(traj_indices, dtype=np.int32), np.array(frame_indices, dtype=np.int32) * stride), \
-           np.array(scores)
+        np.array(scores)
 
 
 def process_indexed_fe_file(indexed_fe_filename, assignments, active_states, eq_probs, mapping, stride=1):
@@ -49,7 +49,8 @@ def process_indexed_fe_file(indexed_fe_filename, assignments, active_states, eq_
     trimmed_filtered_assigns = assignments[inds][mask]
     state_counts = np.bincount(trimmed_filtered_assigns)
     # scale eqch frame weight by the number of counts in each state
-    frame_weights = (eq_probs[mapping] / state_counts)[trimmed_filtered_assigns]
+    frame_weights = (eq_probs[mapping] /
+                     state_counts)[trimmed_filtered_assigns]
     return frame_weights, trimmed_fes
 
 
@@ -70,7 +71,8 @@ def filter_frame_weights(msm_obj, stride, state_counts, ra_assigns, active_state
 # returns RaggedArray of eq_prob per bin divided by number of samples drawn from that bin.
 def expand_bin_weights(eq_probs, lengths):
     return ra.RaggedArray(
-        [p for i, length in enumerate(lengths) for p in repeat(eq_probs[i]/length, length)],
+        [p for i, length in enumerate(lengths)
+         for p in repeat(eq_probs[i]/length, length)],
         lengths=lengths
     )
 
@@ -134,14 +136,17 @@ def best_score(trimmed_binding_fes):
 
 def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath, lengths=None):
     msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
-    kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale  # kd, scaled by user-supplied conversion.
+    # kd, scaled by user-supplied conversion.
+    kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale
     if reweighted_eq:
         # convert trimmed Free energies to association constants
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
         reweights = reweighted_frames(frame_weights, kas)
         fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
-        ra.save(str(outpath/(tag+'-fe.h5')), ra.RaggedArray(fe_per_state, lengths=lengths))
-        ra.save(str(outpath/(tag+'-eq_probs.h5')), ra.RaggedArray(reweights, lengths=lengths))
+        ra.save(str(outpath/(tag+'-fe.h5')),
+                ra.RaggedArray(fe_per_state, lengths=lengths))
+        ra.save(str(outpath/(tag+'-eq_probs.h5')),
+                ra.RaggedArray(reweights, lengths=lengths))
     weighted = weighted_avg(frame_weights, trimmed_fes)
     simple = simple_avg(trimmed_fes)
     best = best_score(trimmed_fes)
@@ -160,7 +165,8 @@ def repack_as_dict(tuple_packed_results):
 
 def interp_trj_samples_worker_index_from_file(rt, assignments, active_states, eq_probs, mapping, stride, kd_scale,
                                               reweighted_eq, outpath, binding_run):
-    tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
+    # turn base filename no ext into tag for saving later.
+    tag = Path(binding_run).stem
     frame_weights, trimmed_fes = process_indexed_fe_file(binding_run, assignments,
                                                          active_states, eq_probs, mapping, stride=stride)
     return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath)
@@ -168,14 +174,17 @@ def interp_trj_samples_worker_index_from_file(rt, assignments, active_states, eq
 
 def interp_trj_samples_worker_strided_inds(rt, active_states, stride, assignments, frame_weights, kd_scale,
                                            reweighted_eq, outpath, binding_run):
-    tag = Path(binding_run).stem  # turn base filename no ext into tag for saving later.
+    # turn base filename no ext into tag for saving later.
+    tag = Path(binding_run).stem
     fes = ra.RaggedArray(np.load(binding_run, allow_pickle=True))
-    trimmed_fes = filter_trim_binding_fes(fes, active_states, stride, assignments)
+    trimmed_fes = filter_trim_binding_fes(
+        fes, active_states, stride, assignments)
     return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath)
 
 
 def interp_trj_samples(args, rt):
-    if args.emma_dtraj:  # note this import here allows the tool to not strictly depend on PyEMMA.
+    # note this import here allows the tool to not strictly depend on PyEMMA.
+    if args.emma_dtraj:
         from pyemma import coordinates as coor
         assignments = coor.load(args.assignments)
         for i, trj in enumerate(assignments):
@@ -199,14 +208,17 @@ def interp_trj_samples(args, rt):
 
     if args.index_from_file:
         mapping = np.array(
-            [msm_obj.mapping_.to_mapped[k] for k in msm_obj.mapping_.to_mapped.keys()],
+            [msm_obj.mapping_.to_mapped[k]
+                for k in msm_obj.mapping_.to_mapped.keys()],
             dtype=np.int32
         )[active_states]
         br_op = partial(interp_trj_samples_worker_index_from_file, rt, assignments, active_states, msm_obj.eq_probs_,
                         mapping, args.stride, args.K_D_scale, args.reweighted_eq_prefix)
     else:
-        state_counts = count_strided_states(assignments, args.stride, active_states)
-        frame_weights = filter_frame_weights(msm_obj, args.stride, state_counts, assignments, active_states)
+        state_counts = count_strided_states(
+            assignments, args.stride, active_states)
+        frame_weights = filter_frame_weights(
+            msm_obj, args.stride, state_counts, assignments, active_states)
         br_op = partial(interp_trj_samples_worker_strided_inds, rt, active_states, args.stride, assignments,
                         frame_weights, args.K_D_scale, args.reweighted_eq, args.out)
 
@@ -227,14 +239,11 @@ def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq, outpath, bi
 
 def interp_bin_samples(args, rt):
     pool = mp.Pool(args.nprocs)
-    br_op = partial(interp_bin_samples_worker, rt, args.eq_probs, args.K_D_scale, args.reweighted_eq, args.out)
+    br_op = partial(interp_bin_samples_worker, rt, args.eq_probs,
+                    args.K_D_scale, args.reweighted_eq, args.out)
     packed_results = pool.map(br_op, args.binding_fes_h5s)
     pool.close()
     return repack_as_dict(packed_results)
-
-
-
-
 
 
 def run_cli(raw_args=None):
@@ -243,7 +252,8 @@ def run_cli(raw_args=None):
     T = 310.0  # Kelvin
     unit_scale = 0.001  # by default convert free energy to kilo-energy units.
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     subparsers = parser.add_subparsers(dest='subparser_name',
                                        help='Select mode of input. Either samples from trajectories, '
                                        'or samples from each bin in an MSM.')
@@ -342,7 +352,7 @@ def run_cli(raw_args=None):
                 new_result = new_results[ligand_name]
                 # if the value is already a list, append
                 if isinstance(result, list):
-                   result.append(new_result)
+                    result.append(new_result)
                 # if not, start a list with result and new result in that order.
                 else:
                     results[ligand_name] = [result, new_result]
@@ -362,4 +372,3 @@ def run_cli(raw_args=None):
 
 if __name__ == '__main__':
     run_cli(raw_args=argv[1:])
-    

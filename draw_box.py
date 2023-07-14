@@ -32,7 +32,7 @@ for updown_x in updown:
             atom_name_fstring = f'{updown_x}{updown_y}{updown_z}'
             xf, yf, zf = updown[updown_x], updown[updown_y], updown[updown_z]
             corner_crd = loos.GCoord(xf * half_x, yf * half_y, zf * half_z) \
-                         + center_crd
+                + center_crd
             corner = loos.Atom(count, atom_name_fstring, corner_crd)
 
             box.append(corner)

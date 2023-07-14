@@ -17,7 +17,8 @@ def floatpair(s, delim=','):
         start_ind, end_ind = map(float, s.split(delim))
         return start_ind, end_ind
     except:
-        raise argparse.ArgumentTypeError('Float pairs must be specified as "decimal.one,decimal.two"')
+        raise argparse.ArgumentTypeError(
+            'Float pairs must be specified as "decimal.one,decimal.two"')
 
 
 def get_assigns_no_map_no_unbox(assignments, nstates):
@@ -76,21 +77,26 @@ def get_assign_inds(assignments, nstates, mapping=None):
     # meaning the ragged array doesn't have singleton elements at the tightest level.
     if len(assignments.shape) == 1:
         if mapping:
-            index_list_by_bin = get_assigns_map_no_unbox(assignments, nstates, mapping)
+            index_list_by_bin = get_assigns_map_no_unbox(
+                assignments, nstates, mapping)
         else:
-            index_list_by_bin = get_assigns_no_map_no_unbox(assignments, nstates)
+            index_list_by_bin = get_assigns_no_map_no_unbox(
+                assignments, nstates)
     # Handle the case where the last element in the shape of the RA is 1 (when it should be 'None').
     # This is interpreted as having singleton elements at the tightest level, and thus unboxing them.
     elif assignments.shape[-1] == 1:
         if mapping:
-            index_list_by_bin = get_assigns_map_unbox(assignments, nstates, mapping)
+            index_list_by_bin = get_assigns_map_unbox(
+                assignments, nstates, mapping)
         else:
             index_list_by_bin = get_assigns_no_map_unbox(assignments, nstates)
     else:  # operate on a normal 2-ragged array.
         if mapping:
-            index_list_by_bin = get_assigns_map_no_unbox(assignments, nstates, mapping)
+            index_list_by_bin = get_assigns_map_no_unbox(
+                assignments, nstates, mapping)
         else:
-            index_list_by_bin = get_assigns_no_map_no_unbox(assignments, nstates)
+            index_list_by_bin = get_assigns_no_map_no_unbox(
+                assignments, nstates)
     return [np.array(bin_indices, dtype=[('traj', np.int32), ('frame', np.int32)]) for bin_indices in index_list_by_bin]
 
 
@@ -111,7 +117,8 @@ def get_specified_number_per_bin_random(assignments, nstates, numbers_desired, m
 
 
 def calc_euclidean_distance(reference, other_frames_in_the_bin):
-    distances = [euclidean(reference, other_frames_in_the_bin[num]) for num in range(len(other_frames_in_the_bin))]
+    distances = [euclidean(reference, other_frames_in_the_bin[num])
+                 for num in range(len(other_frames_in_the_bin))]
     return distances
 
 
@@ -134,20 +141,25 @@ def kmeans_cluster(features, n_clusters):
 def find_closest_frame(cluster_centers, features, indices):
     all_indices = []
     for num, bin in enumerate(cluster_centers):
-        distances = [calc_euclidean_distance(frame, features[num]) for frame in bin]
+        distances = [calc_euclidean_distance(
+            frame, features[num]) for frame in bin]
         min_distance = [np.min(dist) for dist in
                         distances]  # ! Not sure if i want/need this, might be interesting to print out
-        min_distance_loc = [np.where(dist == np.min(dist)) for dist in distances]
+        min_distance_loc = [np.where(dist == np.min(dist))
+                            for dist in distances]
         if len(min_distance_loc[0]) > 1:
-            min_distance_loc = np.random.default_rng().choice(min_distance_loc[0], 1, axis=0, replace=False)[0]
-        frames_to_extract = [indices[num][min_distance_loc[i][0]] for i in range(len(min_distance_loc))]
+            min_distance_loc = np.random.default_rng().choice(
+                min_distance_loc[0], 1, axis=0, replace=False)[0]
+        frames_to_extract = [indices[num][min_distance_loc[i][0]]
+                             for i in range(len(min_distance_loc))]
         all_indices.append(frames_to_extract)
     return all_indices
 
 
 def get_frames_using_kmeans(assignments, nstates, features, n_clusters, mapping):
     print('Mapping features to bins')
-    mapped_features, all_state_indices = map_features(assignments, nstates, mapping, features)
+    mapped_features, all_state_indices = map_features(
+        assignments, nstates, mapping, features)
     print('KMeans clustering of the frames within bins using features provided')
     # ! This line seems slow for some reason (not slow in my jupyter nb)
     cluster_centers = [kmeans_cluster(bin_features, number) for bin_features, number in zip(mapped_features,
@@ -163,8 +175,10 @@ def get_frames_using_kmeans(assignments, nstates, features, n_clusters, mapping)
 def get_centers(assigs, nstates, nd, mapping):
     return np.array([[0, i] for i in range(nstates)]).reshape(nstates, 1, 2)
 
+
 def get_centers_from_centerinds(assigs, nstates, nd, mapping):
-    cens = np.array([[assigs[mapping[mapped_state]]] for mapped_state in mapping])
+    cens = np.array([[assigs[mapping[mapped_state]]]
+                    for mapped_state in mapping])
     print(cens)
     return cens
 
@@ -262,190 +276,197 @@ def pyemma_mapping(msm_obj):
     return mapping
 
 
-frame_selectors = {
-    'random': get_random_per_bin,
-    'specified_totals': get_specified_number_per_bin_random,
-    'centers': get_centers,
-    'centers_from_inds': get_centers_from_centerinds,
-    'kmeans': get_frames_using_kmeans
-}
-
-parser = argparse.ArgumentParser()
-parser.add_argument('receptor_name', type=str,
-                    help="Name to use to use as top-level directory for the docking run tree.")
-parser.add_argument('model', type=str,
-                    help='A loos-interpretable model file that will permit reading the trajectories in "traj_paths".')
-parser.add_argument(metavar='eq_probs|pickled_msm', type=str, dest='eq_probs',
-                    help='.npy file with equilibrium probabilities from MSM, or pickled MSM object.')
-parser.add_argument('frame_selector', type=str,
-                    choices=frame_selectors.keys(),
-                    help='Strategy for selecting frames to represent each MSM bin.')
-parser.add_argument('align_selection', type=str,
-                    help='A file containing a loos selection string to align the selected frames with. Alternatively '
-                         'provide a selection string on the command line.')
-parser.add_argument('traj_paths', type=str, nargs='+',
-                    help='A file containing a list of trajectories corresponding (in matching order) to the supplied '
-                         'assignments file. Alternatively, paths to the trajectory files.')
-# Optional args below here
-parser.add_argument('--align-resid-list', type=str, default=None,
-                    help='If provided, use numbers in file as a list of residue IDs. Concatenate align selection string '
-                         'with one selecting these resids.')
-parser.add_argument('--assignments', type=str, default=None,
-                    help='h5 file with assignments from which MSM was built. Obligatory unless using "centers" selector.')
-parser.add_argument('--clear-bonds', action=argparse.BooleanOptionalAction,
-                    help='If thrown, remove connectivity information from model. If incorrect bonds present, but bonds'
-                         ' are needed, use this in conjunction with "--find-bonds" to first clear old bonds then assign'
-                         ' new ones.')
-parser.add_argument('--find-bonds', type=floatpair, default=None,
-                    help='If no bonds (CONECT records in PDB) are provided in model, find bonds using these cutoffs.')
-parser.add_argument('--make-receptor-sel-chain-A', action=argparse.BooleanOptionalAction, default=True,
-                    help='If thrown, make all atoms a member of chain "A" when writing PDBs.')
-parser.add_argument('--mapping', '-m', type=Path, default=None,
-                    help='Use a supplied path to a mapping or MSM to handle eq_probs that have been reduced '
-                         'relative to the number of clusters in assignments (4x, with ergodic trimming). If not'
-                         ' supplying an enspara MSM, mapping should be a .json of a dict providing the "to_mapped" '
-                         'trim mapping.')
-parser.add_argument('--number-frames', default=10, type=int,
-                    help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
-                         'an error is thrown.')
-parser.add_argument('--subset-selection', type=str, default='all',
-                    help='A loos selection string to subset all frames by (for example, if water is present it could be'
-                         ' stripped here).')
-parser.add_argument('--total-per-bin', default=None, type=str,
-                    help='Text file with totals to draw from each MSM bin. Should be one column of totals, '
-                         'where the row index corresponds to the bin and the entry is the number of frames to draw.')
-parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
-                    help='If thrown, write a DCD with the selected frames in each bin directory.')
-parser.add_argument('--write-bin-dtraj', type=Path, default=None,
-                    help='Write an enspara RaggedArray with each frame index selected to provided path.')
-parser.add_argument('--features', type=Path, default=None,
-                    help='Supply a path to features that were used for clustering. This will then be used to pick sufficiently different frames from the bin by using kmeans clustering within a bin')
-
 if __name__ == '__main__':
-    for i, arg in enumerate(argv):
-        print(i, arg)
-    args = parser.parse_args()
-    try:
-        eq_probs = np.load(args.eq_probs)
-    except ValueError:
+    frame_selectors = {
+        'random': get_random_per_bin,
+        'specified_totals': get_specified_number_per_bin_random,
+        'centers': get_centers,
+        'centers_from_inds': get_centers_from_centerinds,
+        'kmeans': get_frames_using_kmeans
+    }
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('receptor_name', type=str,
+                        help="Name to use to use as top-level directory for the docking run tree.")
+    parser.add_argument('model', type=str,
+                        help='A loos-interpretable model file that will permit reading the trajectories in "traj_paths".')
+    parser.add_argument(metavar='eq_probs|pickled_msm', type=str, dest='eq_probs',
+                        help='.npy file with equilibrium probabilities from MSM, or pickled MSM object.')
+    parser.add_argument('frame_selector', type=str,
+                        choices=frame_selectors.keys(),
+                        help='Strategy for selecting frames to represent each MSM bin.')
+    parser.add_argument('align_selection', type=str,
+                        help='A file containing a loos selection string to align the selected frames with. Alternatively '
+                        'provide a selection string on the command line.')
+    parser.add_argument('traj_paths', type=str, nargs='+',
+                        help='A file containing a list of trajectories corresponding (in matching order) to the supplied '
+                        'assignments file. Alternatively, paths to the trajectory files.')
+    # Optional args below here
+    parser.add_argument('--align-resid-list', type=str, default=None,
+                        help='If provided, use numbers in file as a list of residue IDs. Concatenate align selection string '
+                        'with one selecting these resids.')
+    parser.add_argument('--assignments', type=str, default=None,
+                        help='h5 file with assignments from which MSM was built. Obligatory unless using "centers" selector.')
+    parser.add_argument('--clear-bonds', action=argparse.BooleanOptionalAction,
+                        help='If thrown, remove connectivity information from model. If incorrect bonds present, but bonds'
+                        ' are needed, use this in conjunction with "--find-bonds" to first clear old bonds then assign'
+                        ' new ones.')
+    parser.add_argument('--find-bonds', type=floatpair, default=None,
+                        help='If no bonds (CONECT records in PDB) are provided in model, find bonds using these cutoffs.')
+    parser.add_argument('--make-receptor-sel-chain-A', action=argparse.BooleanOptionalAction, default=True,
+                        help='If thrown, make all atoms a member of chain "A" when writing PDBs.')
+    parser.add_argument('--mapping', '-m', type=Path, default=None,
+                        help='Use a supplied path to a mapping or MSM to handle eq_probs that have been reduced '
+                        'relative to the number of clusters in assignments (4x, with ergodic trimming). If not'
+                        ' supplying an enspara MSM, mapping should be a .json of a dict providing the "to_mapped" '
+                        'trim mapping.')
+    parser.add_argument('--number-frames', default=10, type=int,
+                        help='Number of frames to select per-bin. If a bin has fewer total assignments than this value, '
+                        'an error is thrown.')
+    parser.add_argument('--subset-selection', type=str, default='all',
+                        help='A loos selection string to subset all frames by (for example, if water is present it could be'
+                        ' stripped here).')
+    parser.add_argument('--total-per-bin', default=None, type=str,
+                        help='Text file with totals to draw from each MSM bin. Should be one column of totals, '
+                        'where the row index corresponds to the bin and the entry is the number of frames to draw.')
+    parser.add_argument('--write-bin-trajs', action=argparse.BooleanOptionalAction,
+                        help='If thrown, write a DCD with the selected frames in each bin directory.')
+    parser.add_argument('--write-bin-dtraj', type=Path, default=None,
+                        help='Write an enspara RaggedArray with each frame index selected to provided path.')
+    parser.add_argument('--features', type=Path, default=None,
+                        help='Supply a path to features that were used for clustering. This will then be used to pick sufficiently different frames from the bin by using kmeans clustering within a bin')
+
+    if __name__ == '__main__':
+        for i, arg in enumerate(argv):
+            print(i, arg)
+        args = parser.parse_args()
         try:
-            eq_probs = np.load(args.eq_probs, allow_pickle=True).item().eq_probs_
-        except AttributeError:
-            with open(args.eq_probs, 'rb') as f:
-                eq_probs = pickle.load(f).pi
+            eq_probs = np.load(args.eq_probs)
+        except ValueError:
+            try:
+                eq_probs = np.load(
+                    args.eq_probs, allow_pickle=True).item().eq_probs_
+            except AttributeError:
+                with open(args.eq_probs, 'rb') as f:
+                    eq_probs = pickle.load(f).pi
 
-    if args.frame_selector == 'centers':
-        assignments = np.arange(eq_probs.shape[0])
-    elif args.frame_selector == 'centers_from_inds':
-        assignments = np.load(args.assignments)
-    else:
-        assignments = ra.load(args.assignments)
-    model = loos.createSystem(args.model)
-    # check to see if it was requested that we remove bond information
-    # (if it's foouling up parsing, by prep script, for example)
-    if args.clear_bonds:
-        model.clearBonds()
-    # Assign bonds using cutoffs here.
-    if not model.hasBonds():
-        print('Bond specifiers not found in model file.')
-        if args.find_bonds:
-            print('Defining bonds using distance cutoffs; ', args.find_bonds[0], 'angstrom for heavy atoms, and ',
-                  args.find_bonds[1], 'angstroms for hydrogens.')
-            model = add_bonds_two_cuts(model, *args.find_bonds)
-    # AutoDock usually needs this to produce working parameterizations.
-    if args.make_receptor_sel_chain_A:
-        for atom in model:
-            atom.chainId('A')
-    align_sel = ''
-    if args.align_resid_list:
-        alresids = np.genfromtxt(args.align_resid_list).astype(int)
-        align_sel += ' || '.join(['resid == {}'.format(i) for i in alresids]) + " &&"
+        if args.frame_selector == 'centers':
+            assignments = np.arange(eq_probs.shape[0])
+        elif args.frame_selector == 'centers_from_inds':
+            assignments = np.load(args.assignments)
+        else:
+            assignments = ra.load(args.assignments)
+        model = loos.createSystem(args.model)
+        # check to see if it was requested that we remove bond information
+        # (if it's foouling up parsing, by prep script, for example)
+        if args.clear_bonds:
+            model.clearBonds()
+        # Assign bonds using cutoffs here.
+        if not model.hasBonds():
+            print('Bond specifiers not found in model file.')
+            if args.find_bonds:
+                print('Defining bonds using distance cutoffs; ', args.find_bonds[0], 'angstrom for heavy atoms, and ',
+                      args.find_bonds[1], 'angstroms for hydrogens.')
+                model = add_bonds_two_cuts(model, *args.find_bonds)
+        # AutoDock usually needs this to produce working parameterizations.
+        if args.make_receptor_sel_chain_A:
+            for atom in model:
+                atom.chainId('A')
+        align_sel = ''
+        if args.align_resid_list:
+            alresids = np.genfromtxt(args.align_resid_list).astype(int)
+            align_sel += ' || '.join(['resid == {}'.format(i)
+                                     for i in alresids]) + " &&"
 
-    # if filename is provided read its contents to obtain align string
-    try:
-        align_sel += " (" + Path(args.align_selection).read_text() + ")"
-    except FileNotFoundError:  # if the string is not a file name, interpret it as a loos selection string.
-        align_sel += " (" + args.align_selection + ")"
+        # if filename is provided read its contents to obtain align string
+        try:
+            align_sel += " (" + Path(args.align_selection).read_text() + ")"
+        # if the string is not a file name, interpret it as a loos selection string.
+        except FileNotFoundError:
+            align_sel += " (" + args.align_selection + ")"
 
-    # get frame counts, however it's prescribed
+        # get frame counts, however it's prescribed
 
-    if args.total_per_bin:
-        frame_counts = np.loadtxt(args.total_per_bin, dtype=int)
+        if args.total_per_bin:
+            frame_counts = np.loadtxt(args.total_per_bin, dtype=int)
 
-    elif args.assignments:
-        if args.frame_selector == 'centers_from_inds':
+        elif args.assignments:
+            if args.frame_selector == 'centers_from_inds':
+                frame_counts = 1
+            else:
+                low_inds = np.where(
+                    np.bincount(assignments.flatten()) < args.number_frames)
+                if len(low_inds[0]) > 0:
+                    print(
+                        'The(se) bin(s) have fewer than your requested samples in them:')
+                    print(low_inds[0])
+                    print('You requested this many frames per bin:')
+                    print(args.number_frames)
+                    print('Exiting.')
+                    exit(1)
+
+                frame_counts = args.number_frames
+        else:  # this is in the event that we have no assignments, and are just pulling centers
             frame_counts = 1
+
+        mapping = None
+        if args.mapping:
+            if args.mapping.suffix == '.json':
+                strmapping = json.load(args.mapping.open())
+                mapping = {}
+                for k, v in strmapping.items():
+                    mapping[int(k)] = v
+            elif args.mapping.suffix == '.npy':
+                mapping = np.load(
+                    args.mapping, allow_pickle=True).item().mapping_.to_mapped
+            elif args.mapping.suffix == '.pickle':
+                msm = np.load(args.mapping, allow_pickle=True)
+                mapping = pyemma_mapping(msm)
+
+            else:
+                print(args.mapping, 'does not have an extension that implies it is either a pickled msm or a mapping '
+                                    'object (.json, .npy or .pickle). Unsupported format. Exiting.')
+                exit(2)
+
+        if args.features:
+            features = ra.load(args.features)
+            chosen_frames = frame_selectors[args.frame_selector](
+                assignments,
+                eq_probs.shape[0],
+                features,
+                frame_counts,
+                mapping
+            )
         else:
-            low_inds = np.where(
-                np.bincount(assignments.flatten()) < args.number_frames)
-            if len(low_inds[0]) > 0:
-                print('The(se) bin(s) have fewer than your requested samples in them:')
-                print(low_inds[0])
-                print('You requested this many frames per bin:')
-                print(args.number_frames)
-                print('Exiting.')
-                exit(1)
+            chosen_frames = frame_selectors[args.frame_selector](
+                assignments,
+                eq_probs.shape[0],
+                frame_counts,
+                mapping
+            )
 
-            frame_counts = args.number_frames
-    else:  # this is in the event that we have no assignments, and are just pulling centers
-        frame_counts = 1
-
-    mapping = None
-    if args.mapping:
-        if args.mapping.suffix == '.json':
-            strmapping = json.load(args.mapping.open())
-            mapping = {}
-            for k, v in strmapping.items():
-                mapping[int(k)] = v
-        elif args.mapping.suffix == '.npy':
-            mapping = np.load(args.mapping, allow_pickle=True).item().mapping_.to_mapped
-        elif args.mapping.suffix == '.pickle':
-            msm = np.load(args.mapping, allow_pickle=True)
-            mapping = pyemma_mapping(msm)
-
+        if len(args.traj_paths) == 1:
+            traj_paths = []
+            p_trjs = Path(args.traj_paths[0])
+            if p_trjs.suffix == '.txt':
+                traj_paths = p_trjs.read_text().split()
+            elif p_trjs.suffix == '.pickle':
+                traj_paths.append(unpickle_resave_centers(p_trjs))
+            elif p_trjs.suffix == '.npy':
+                traj_paths = np.load(str(p_trjs), allow_pickle=True)
+            else:
+                traj_paths.append(p_trjs)
         else:
-            print(args.mapping, 'does not have an extension that implies it is either a pickled msm or a mapping '
-                                'object (.json, .npy or .pickle). Unsupported format. Exiting.')
-            exit(2)
-
-    if args.features:
-        features = ra.load(args.features)
-        chosen_frames = frame_selectors[args.frame_selector](
-            assignments,
-            eq_probs.shape[0],
-            features,
-            frame_counts,
-            mapping
+            traj_paths = args.traj_paths
+            print(traj_paths)
+        print('aligning with the following selection string:')
+        print(align_sel)
+        out_path = Path(args.receptor_name) / 'receptor'
+        full_inds, subset_vec, align_vec = rip_conformations(
+            chosen_frames, model, args.subset_selection, align_sel, traj_paths
         )
-    else:
-        chosen_frames = frame_selectors[args.frame_selector](
-            assignments,
-            eq_probs.shape[0],
-            frame_counts,
-            mapping
-        )
-
-    if len(args.traj_paths) == 1:
-        traj_paths = []
-        p_trjs = Path(args.traj_paths[0])
-        if p_trjs.suffix == '.txt':
-            traj_paths = p_trjs.read_text().split()
-        elif p_trjs.suffix == '.pickle':
-            traj_paths.append(unpickle_resave_centers(p_trjs))
-        elif p_trjs.suffix == '.npy':
-           traj_paths = np.load(str(p_trjs), allow_pickle=True)
-        else:
-            traj_paths.append(p_trjs)
-    else:
-        traj_paths = args.traj_paths
-        print(traj_paths)
-    print('aligning with the following selection string:')
-    print(align_sel)
-    out_path = Path(args.receptor_name) / 'receptor'
-    full_inds, subset_vec, align_vec = rip_conformations(
-        chosen_frames, model, args.subset_selection, align_sel, traj_paths
-    )
-    align_samples(subset_vec, align_vec)
-    write_sampled_frames(subset_vec, full_inds, out_path, args.write_bin_trajs)
-    if args.write_bin_dtraj:
-        ra.save(args.write_bin_dtraj, chosen_frames)
+        align_samples(subset_vec, align_vec)
+        write_sampled_frames(subset_vec, full_inds,
+                             out_path, args.write_bin_trajs)
+        if args.write_bin_dtraj:
+            ra.save(args.write_bin_dtraj, chosen_frames)
