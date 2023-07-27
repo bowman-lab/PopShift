@@ -33,16 +33,18 @@ docking_parallel.py     	--> use for docking in parallel on a single node using 
     python setup.py build install  
 3. Smina
     - > conda install -c conda-forge smina
-4. Antechamber from AmberTools 
-    - > conda install -c conda-forge ambertools
-5. popshift.py
+4. popshift.py
    - Install enspara into your python environment, so that `popshift.py` can import it when run
    - If using PyEMMA discretized trajectories, then it must be installed:
      - > conda install -c conda-forge pyemma
    - Usage can be had by saying `python popshift.py` with no arguments. Help can be had with the `--help` flag.
-6. LOOS (for `pick_align_frames.py`, `draw_box.py`, `add_bonds_posthoc.py`, and `rmsd_receptor_ligand.py`)
+5. LOOS (for `pick_align_frames.py`, `draw_box.py`, `add_bonds_posthoc.py`, and `rmsd_receptor_ligand.py`)
     - > conda install -c conda-forge loos
     - Can also be compiled following the instructions on the [loos github](https://github.com/GrossfieldLab/loos)
-### Install conda dependencies in one line (better results; conda less likely to get confused):
-   >mamba install -c conda-forge numpy boost-cpp swig smina ambertools parallel pyemma
-- Note: you still need to do compilation steps for enspara and autodock vina, most likely. You can do this all as one line first, though.   
+## Conda command for dependencies
+### minimal
+   > mamba install -c conda-forge -c insilichem autodocktools-prepare smina loos cython mdtraj 
+
+- these last two will be for installing enspara, which needs to be done by cloning the repository and using the `setup.py` script with the correct conda environment activated.
+
+- Note: you still need to do compilation steps for enspara and (if desired) autodock VINA.   
