@@ -1,3 +1,42 @@
+# Introduction
+
+This is a repository containing some command-line tools for implementing the PopShift framework for docking. The purpose behind these tools are to allow users both to make alterations to these workflows for their own use, and also to apply them in similar fashion to the use they were put toward in the original [PopShift manuscript](https://www.biorxiv.org/content/10.1101/2023.07.14.549110v2). They're provided with the GPLv2 license, in the hope that others find them useful in their own projects, but also with the explicit intention of receiving improvements as others make them in their own contexts. Below you'll find a discussion of the general workflow from that paper, as well as some documentation of what each script does. Note that these command line tools all also have `argparse` I/O tools, so if you're wondering about how to use them in more detail calling them with no arguments, or with the `-h` or `--help` flags will print some help text that may be more rapidly useful than leafing through this document.
+
+# Workflows
+The scripts provided here are supposed to be modular enough that you can adjust them to your needs, or swap one part out in place of another part--we are certainly going to do this as our research on this framework evolves, so why shouldn't you? However, there are a few pathways that probably make general sense to understand, and the easiest way to begin to see what order things need to happen in is probably with some prescribed workflows. Find some below:
+
+## Docking to an MSM
+
+In the original PopShift MS, we considered how to apply the PopShift framework to the ensemble docking problem. The general workflow to actuate that study, with the tool(s) needed, follows:
+
+1. Obtain a satisfactory MSM representing ligand-free simulations of your receptor.
+2. Determine where you'd like to dock to--for VINA/SMINA this amounts to picking where to put your box. Optionally, use `draw_box.py` to check where your box is.
+3. Pick and align frames from the MSM using `pick_align_frames.py` to ensure that all the residues that should be in your box are nicely co-aligned.
+   - Optionally, check that things landed where you expected them to land using a visualizer like `pymol` and `draw_box.py`. 
+4. Prepare receptors and ligands (using either OpenBabel or AutoDock Tools `prepare_receptor` and `prepare_ligand`), here you have some alternatives:
+   - `prep_parallel.py` uses python's `multiprocessing` module to call `prepare_receptor`. `prepare_ligand`, because it is faster, was not parallelized in this way.
+   - Alternatively, use `prepare_ligand` and `prepare_receptor` on the command line directly with your favorite shell concurrency tool such as `xargs` or GNU `parallel`.
+   - Alternatively, use `obabel` with the `-o pdbqt` flag.
+5. Dock to each sample, saving the docking score in the file containing the ligand pose, using `docking_parallel.py`.
+6. Extract scores from these output files and collate them into arrays using `extract_scores.py`
+7. Use the score arrays to do PopShift calculations, with `popshift.py`
+8. Plot stuff, compare to experiments, and generally *go nuts*, by reading the JSON that `popshift.py` outputs into your downstream scripts or notebooks.
+
+Note that the docking here is done with either VINA or SMINA, so steps 4, 5, and 6 are somewhat particular to how those codes do that. You can of course color outside of the lines here, but you'll probably be adding some functionality to the scripts we have in order to do so.
+
+### On preparing ligands
+
+In general these scripts are set up to play nicely with one another by assuming that the directory structure of the intermediate files will be maintained--this isn't a hard requirement, but it does keep things convenient. Because we are using other command-line tools to prepare ligands and receptors for docking, we are really just expecting that the prepared files will be in the same place as the files they were prepped from. There are a lot of ways to call a command-line tool on a file such that it writes a new file with the same path but a different file extension. Here are several I like/have used in the past:
+
+Using GNU parallel:
+```
+# use find to get the paths rel. to CWD;
+# write to file to prevent arg-list too long
+find frame_picking_system_dir/receptor/ -name '*.pdb' > receptor_paths.txt
+# Don't use too many jobs; I/O intensive task will be bound by disk perf.
+parallel -j 8 obabel -opdbqt {} -O {}qt :::: receptor_paths.txt
+```
+What's going on here? Scrutinizing the docs for [parallel](https://www.gnu.org/software/parallel/parallel_tutorial.html) suggests that parallel will be running the commandline 
 # Docking scripts
 
 ## Prepare receptor and ligands
