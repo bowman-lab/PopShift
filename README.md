@@ -2,6 +2,49 @@
 
 This is a repository containing some command-line tools for implementing the PopShift framework for docking. The purpose behind these tools are to allow users both to make alterations to these workflows for their own use, and also to apply them in similar fashion to the use they were put toward in the original [PopShift manuscript](https://www.biorxiv.org/content/10.1101/2023.07.14.549110v2). They're provided with the GPLv2 license, in the hope that others find them useful in their own projects, but also with the explicit intention of receiving improvements as others make them in their own contexts. Below you'll find a discussion of the general workflow from that paper, as well as some documentation of what each script does. Note that these command line tools all also have `argparse` I/O tools, so if you're wondering about how to use them in more detail calling them with no arguments, or with the `-h` or `--help` flags will print some help text that may be more rapidly useful than leafing through this document.
 
+# Installation
+
+These python scripts are designed to be used as command-line tools; some can also be imported into python interpreter sessions or notebooks, if one is interested in calling the functions from them independently. Thus, getting python environments set up with the correct modules present is the main installation task. Getting the parameterization program associated with the docking code you're interested in installed is the other major task.
+
+## System preparation programs
+
+The two preparation programs we've used are for autodock family programs, and generate PDBQT files. They are:
+
+### OpenBabel
+
+Get it from conda-forge:
+`mamba install -c conda-forge openbabel`
+
+Get it from apt (for debian-like systems):
+`sudo apt install openbabel`
+
+### `prepare_receptor` and `prepare_ligand`:
+
+Because these programs _require_ python 2, and therefore don't play nicely with any other python tools written anytime recently, they are best installed from the tarball available from the [ADFR website](https://ccsb.scripps.edu/adfr/downloads/). You should follow the directions there to get them added to your path.
+
+Note that you can view the [licenses](https://ccsb.scripps.edu/adfr/license/) these programs are being provided under on that same site. Because we only need `prepare_receptor` and `prepare_ligand`, these are available under LGPLv2 at time of writing.
+
+## Docking programs
+
+Right now our scripts are set up to either use [VINA](https://vina.scripps.edu/) or [SMINA](https://github.com/mwojcikowski/smina). In both cases the easiest way to get either set up is to install into a conda env for docking:
+```
+mamba create -n docking -c conda-forge smina vina
+```
+
+We have run into an issue with using VINA from `conda-forge` source; in particular, we found [there was a bug](https://github.com/ccsb-scripps/AutoDock-Vina/issues/90) that produced pretty significant variability in docking scores given the same pose, which is pretty bad for this application where the scores themselves are being used. We also noticed another bug whereby sometimes, seemingly at random across thousands of docking runs, a handful of poses will be given an extra 10-15 kcal/mol of favorability. There are several other energy function bugs on their issue tracker that this could be. Until the version on conda forge is greater than `1.2.4` we'd recommend compiling the `develop` branch of [VINA hosted on github](https://github.com/ccsb-scripps/AutoDock-Vina), following their install instructions for [building from source](https://autodock-vina.readthedocs.io/en/latest/installation.html#building-from-source), focusing on the python bindings since that's the only part of the install used by `docking_parallel.py`.
+
+Note if you are trying to get the right compilers available you can install those from conda forge via the `compilers` repository. Here's an example install line:
+```
+mamba create -n built-vina -c conda-forge compilers boost-cpp swig numpy
+```
+Then you'd set up the python bindings:
+```
+conda activate built-vina
+cd path/to/cloned/Autodock-Vina/build/python
+rm -rf build dist *.egg-info
+python setup.py build install
+```
+
 # Workflows
 
 The scripts provided here are supposed to be modular enough that you can adjust them to your needs, or swap one part out in place of another part--we are certainly going to do this as our research on this framework evolves, so why shouldn't you? However, there are a few pathways that probably make general sense to understand, and the easiest way to begin to see what order things need to happen in is probably with some prescribed workflows. Find some below:
@@ -26,11 +69,17 @@ In the original PopShift MS, we considered how to apply the PopShift framework t
 
 Note that the docking here is done with either VINA or SMINA, so steps 4, 5, and 6 are somewhat particular to how those codes do that. You can of course color outside of the lines here, but you'll probably be adding some functionality to the scripts we have in order to do so.
 
-### On preparing ligands
 
-In general these scripts are set up to play nicely with one another by assuming that the directory structure of the intermediate files will be maintained--this isn't a hard requirement, but it does keep things convenient. Because we are using other command-line tools to prepare ligands and receptors for docking, we are really just expecting that the prepared files will be in the same place as the files they were prepped from. There are a lot of ways to call a command-line tool on a file such that it writes a new file with the same path but a different file extension. Here are several I like/have used in the past:
+# Docking scripts
+
+## On preparing receptors and ligands for docking
+
+We prepare each of the receptor conformations as a completely independent system, so it gets its own PDBQT file and can thus be run as an isolated job on whatever hardware is available. This leaves some things to be desired, but as a first pass it's worked for us.
+
+In general these scripts are set up to play nicely with one another by assuming that the directory structure of the intermediate files will be maintained--this isn't a hard requirement, but it does keep things convenient. Because we are using other command-line tools to prepare ligands and receptors for docking, we are really just expecting that the prepared files will be in the same place as the files they were prepped from. There are a lot of ways to call a command-line tool on a file such that it writes a new file with the same path but a different file extension. Here are several I have used in the past:
 
 Using GNU parallel:
+
 ```
 # use find to get the paths rel. to CWD;
 # write to file to prevent arg-list too long
@@ -38,28 +87,29 @@ find frame_picking_system_dir/receptor/ -name '*.pdb' > receptor_paths.txt
 # Don't use too many jobs; I/O intensive task will be bound by disk perf.
 parallel -j 8 obabel -opdbqt {} -O {}qt :::: receptor_paths.txt
 ```
+
 Or with `prepare_receptor`:
+
 ```
 parallel -j 8 prepare_receptor -r {} -o {}.pdbqt :::: receptor_paths.txt
 ```
 
-What's going on here? Scrutinizing the docs for [parallel](https://www.gnu.org/software/parallel/parallel_tutorial.html) suggests that parallel will be running the commandline 
+What's going on here? Scrutinizing the docs for [parallel](https://www.gnu.org/software/parallel/parallel_tutorial.html) suggests that parallel will be running the commandline on each of the elements in the file when in `::::` input mode. It substitutes each line into the 'command line' you provide as an argument wherever the curly braces are, then runs that as its own subprocess.
 
-Sometimes we don't need this done at breakneck, and can afford to simply do this sequentially. In this case, by far the easiest thing to do is write a simple loop in the shell of your chosing. Here's a while loop that takes advantage of the file-redirect from find we used earlier:
+Using xargs as an alternative to parallel:
+
+```
+find frame_picking_system_dir/receptor/ -name '*.pdb' | xargs -I% -n 1 -P 8 obabel -opdbqt % -O %qt
+```
+
+If only dealing with a few frame-picking runs (or maybe just one) for a relatively parsimonious MSM (one with few states), we can afford to do this sequentially (nicer if you're getting errors, as well). In this case, by far the easiest thing to do is write a simple loop in the shell of your chosing. Here's a while loop that takes advantage of the redirect-to-file from `find` given in the `parallel` example:
+
 ```
 while read receptor_path; do
+    echo $receptor_path
     obabel -opdbqt $receptor_path -O ${receptor_path}qt
 done < receptor_paths.txt
-``````
-
-# Docking scripts
-
-## Prepare receptor and ligands
-prep_parallel.py --> use to prepare receptor files and ligands
-
-    python prep_parallel.py --help # for options on how to run
-
-prepare_ligand.py --> prep_parallel does this now, so this is not needed  
+```
 
 ## Dock
 docking_parallel.py     	--> use for docking in parallel on a single node using vina or smina scoring function  
