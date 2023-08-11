@@ -3,6 +3,7 @@
 This is a repository containing some command-line tools for implementing the PopShift framework for docking. The purpose behind these tools are to allow users both to make alterations to these workflows for their own use, and also to apply them in similar fashion to the use they were put toward in the original [PopShift manuscript](https://www.biorxiv.org/content/10.1101/2023.07.14.549110v2). They're provided with the GPLv2 license, in the hope that others find them useful in their own projects, but also with the explicit intention of receiving improvements as others make them in their own contexts. Below you'll find a discussion of the general workflow from that paper, as well as some documentation of what each script does. Note that these command line tools all also have `argparse` I/O tools, so if you're wondering about how to use them in more detail calling them with no arguments, or with the `-h` or `--help` flags will print some help text that may be more rapidly useful than leafing through this document.
 
 # Workflows
+
 The scripts provided here are supposed to be modular enough that you can adjust them to your needs, or swap one part out in place of another part--we are certainly going to do this as our research on this framework evolves, so why shouldn't you? However, there are a few pathways that probably make general sense to understand, and the easiest way to begin to see what order things need to happen in is probably with some prescribed workflows. Find some below:
 
 ## Docking to an MSM
@@ -10,9 +11,10 @@ The scripts provided here are supposed to be modular enough that you can adjust 
 In the original PopShift MS, we considered how to apply the PopShift framework to the ensemble docking problem. The general workflow to actuate that study, with the tool(s) needed, follows:
 
 1. Obtain a satisfactory MSM representing ligand-free simulations of your receptor.
-2. Determine where you'd like to dock to--for VINA/SMINA this amounts to picking where to put your box. Optionally, use `draw_box.py` to check where your box is.
+2. Determine a selection that picks out your pocket of interest.
 3. Pick and align frames from the MSM using `pick_align_frames.py` to ensure that all the residues that should be in your box are nicely co-aligned.
-   - Optionally, check that things landed where you expected them to land using a visualizer like `pymol` and `draw_box.py`. 
+   - Check that things landed where you expected them to land using a visualizer like `pymol` and `draw_box.py`.
+   - Noting that the alignment will recenter the coordinate system of all the models at the centroid of the atoms selected as the 'pocket' atoms, so boxes centered at or close to `0,0,0` are probably good choices in general.
 4. Prepare receptors and ligands (using either OpenBabel or AutoDock Tools `prepare_receptor` and `prepare_ligand`), here you have some alternatives:
    - `prep_parallel.py` uses python's `multiprocessing` module to call `prepare_receptor`. `prepare_ligand`, because it is faster, was not parallelized in this way.
    - Alternatively, use `prepare_ligand` and `prepare_receptor` on the command line directly with your favorite shell concurrency tool such as `xargs` or GNU `parallel`.
@@ -36,7 +38,20 @@ find frame_picking_system_dir/receptor/ -name '*.pdb' > receptor_paths.txt
 # Don't use too many jobs; I/O intensive task will be bound by disk perf.
 parallel -j 8 obabel -opdbqt {} -O {}qt :::: receptor_paths.txt
 ```
+Or with `prepare_receptor`:
+```
+parallel -j 8 prepare_receptor -r {} -o {}.pdbqt :::: receptor_paths.txt
+```
+
 What's going on here? Scrutinizing the docs for [parallel](https://www.gnu.org/software/parallel/parallel_tutorial.html) suggests that parallel will be running the commandline 
+
+Sometimes we don't need this done at breakneck, and can afford to simply do this sequentially. In this case, by far the easiest thing to do is write a simple loop in the shell of your chosing. Here's a while loop that takes advantage of the file-redirect from find we used earlier:
+```
+while read receptor_path; do
+    obabel -opdbqt $receptor_path -O ${receptor_path}qt
+done < receptor_paths.txt
+``````
+
 # Docking scripts
 
 ## Prepare receptor and ligands
