@@ -45,6 +45,10 @@ rm -rf build dist *.egg-info
 python setup.py build install
 ```
 
+## Trajectory manipulation and postprocessing
+
+To run the python tools associated with trajectory manipulation and post processing you'll need [`loos`](https://github.com/GrossfieldLab/loos), a trajectory handling library, and [`enspara`](https://github.com/bowman-lab/enspara), an MSM/utilities library. You'll also very likely need either [`pyemma`](http://www.emma-project.org/latest/), [`deeptime`](http://www.emma-project.org/latest/), or both.
+
 # Workflows
 
 The scripts provided here are supposed to be modular enough that you can adjust them to your needs, or swap one part out in place of another part--we are certainly going to do this as our research on this framework evolves, so why shouldn't you? However, there are a few pathways that probably make general sense to understand, and the easiest way to begin to see what order things need to happen in is probably with some prescribed workflows. Find some below:
