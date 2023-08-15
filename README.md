@@ -24,7 +24,46 @@ In the original PopShift MS, we considered how to apply the PopShift framework t
 
 Note that the docking here is done with either VINA or SMINA, so steps 4, 5, and 6 are somewhat particular to how those codes do that. You can of course color outside of the lines here, but you'll probably be adding some functionality to the scripts we have in order to do so.
 
-### On preparing ligands
+### Frame picking using `pick_align_frames.py`
+
+For the docking below to work as completely independent jobs, we extract frames representing each state, then save them into subdirectories where each subdirectory name corresponds to the MSM state index. Each file name consists of a trajectory index, then a frame index, separated by a dash. Here is an example of frames picked from a 25 state MSM built from five longish trajectories (obtained by calling `tree -v receptor`) output abbreviated for clarity:
+
+```
+receptor/
+├── 0
+│   ├── 0-55257.pdb
+│   ├── 0-55257.pdbqt
+│   ├── 0-56428.pdb
+│   ├── 0-56428.pdbqt
+│   ├── 1-43334.pdb
+│   └── 1-43334.pdbqt
+├── 1
+│   ├── 2-105110.pdb
+│   ├── 2-105110.pdbqt
+│   ├── 2-175513.pdb
+│   ├── 2-175513.pdbqt
+│   ├── 3-48068.pdb
+│   └── 3-48068.pdbqt
+├── 2
+│   ├── 0-157652.pdb
+│   ├── 0-157652.pdbqt
+│   ├── 0-158908.pdb
+│   ├── 0-158908.pdbqt
+│   ├── 0-191040.pdb
+│   └── 0-191040.pdbqt
+...
+└── 24
+    ├── 4-24060.pdb
+    ├── 4-24060.pdbqt
+    ├── 4-186351.pdb
+    ├── 4-186351.pdbqt
+    ├── 4-189200.pdb
+    └── 4-189200.pdbqt
+
+25 directories, 150 files
+```
+
+### Preparing Receptors
 
 In general these scripts are set up to play nicely with one another by assuming that the directory structure of the intermediate files will be maintained--this isn't a hard requirement, but it does keep things convenient. Because we are using other command-line tools to prepare ligands and receptors for docking, we are really just expecting that the prepared files will be in the same place as the files they were prepped from. There are a lot of ways to call a command-line tool on a file such that it writes a new file with the same path but a different file extension. Here are several I like/have used in the past:
 
@@ -37,19 +76,28 @@ find frame_picking_system_dir/receptor/ -name '*.pdb' > receptor_paths.txt
 parallel -j 8 obabel -opdbqt {} -O {}qt :::: receptor_paths.txt
 ```
 What's going on here? Scrutinizing the docs for [parallel](https://www.gnu.org/software/parallel/parallel_tutorial.html) suggests that parallel will be running the commandline 
-# Docking scripts
 
-## Prepare receptor and ligands
-prep_parallel.py --> use to prepare receptor files and ligands
+### Preparing Ligands
 
-    python prep_parallel.py --help # for options on how to run
+Ligands can also be prepped by command-line tools; the docking script `docking_parallel.py` expects you to provide the ligands as either a text-file of ligand paths or as a series of command-line arguments. As such, you can organize these files how you see fit. I usually put them in their own directory, then prep 'everything' with a certain file extension within that directory. So for example:
 
-prepare_ligand.py --> prep_parallel does this now, so this is not needed  
+```
+# Assume there's a directory called ligands with .sdf or .mol2 files in it
+parallel -j 8 obabel {} -h -isdf -opdbqt -O{.}.pdbqt ::: ligands/*.sdf
+```
+NOTE: the `-h` flag adds hydrogens. Don't throw it if you don't want that.
 
-## Dock
-docking_parallel.py     	--> use for docking in parallel on a single node using vina or smina scoring function  
+Alternatively, if you have the ADFR suite installed and would like to use `prepare_ligand` instead of openbabel (note you need `.mol2` or `.pdb` files for `prepare_ligand`, as of this writing):
 
-    python docking_parallel.py --help # for options on how to run
+```
+parallel -j 8 prepare_ligand -l {} -Ahydrogens -o{.}.pdbqt ::: ligands/*.mol2
+```
+
+## Docking using Jug
+
+Again here there are many ways to organize docking so long as the docking code is available on the command-line. We like to use Jug, because it integrates well with our workload manager (slurm). We have also used it with lsf.
+
+
 
 ## Analyze results with MSM docking framework
 ### Extract scores
