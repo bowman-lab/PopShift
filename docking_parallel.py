@@ -91,7 +91,7 @@ if __name__ == '__main__' or jug.is_jug_running():
                         help='AutoDock-Vina exhaustiveness parameter. Threads used proportional to this value.')
     parser.add_argument('--protein-prefix', type=str, default='frame00',
                         help='String to prefix output pdbqts with.')
-    parser.add_argument('-d', '--docking_algorithm', default='vina',
+    parser.add_argument('-d', '--docking-algorithm', default='vina',
                         choices=docking_methods.keys(),
                         help='Pick which docking algorithm to use.')
     parser.add_argument('-s', '--symlink-receptors', action=argparse.BooleanOptionalAction,
