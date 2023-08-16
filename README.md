@@ -49,6 +49,16 @@ python setup.py build install
 
 To run the python tools associated with trajectory manipulation and post processing you'll need [`loos`](https://github.com/GrossfieldLab/loos), a trajectory handling library, and [`enspara`](https://github.com/bowman-lab/enspara), an MSM/utilities library. You'll also very likely need either [`pyemma`](http://www.emma-project.org/latest/), [`deeptime`](http://www.emma-project.org/latest/), or both.
 
+A tidy way to install all of these into the same environment is to grab the libraries that are available on `conda-forge` and also the depeendencies that are needed for enspara, then clone enspara and build it using its `setup.py` script.
+
+```
+mamba create -n popshift -c conda-forge loos deeptime pyemma mdtraj cython mpi4py
+conda activate popshift
+git clone https://github.com/bowman-lab/enspara
+cd enspara
+python setup.py install
+```
+
 # Workflows
 
 The scripts provided here are supposed to be modular enough that you can adjust them to your needs, or swap one part out in place of another part--we are certainly going to do this as our research on this framework evolves, so why shouldn't you? However, there are a few pathways that probably make general sense to understand, and the easiest way to begin to see what order things need to happen in is probably with some prescribed workflows. Find some below:
@@ -63,8 +73,7 @@ In the original PopShift MS, we considered how to apply the PopShift framework t
    - Check that things landed where you expected them to land using a visualizer like `pymol` and `draw_box.py`.
    - Noting that the alignment will recenter the coordinate system of all the models at the centroid of the atoms selected as the 'pocket' atoms, so boxes centered at or close to `0,0,0` are probably good choices in general.
 4. Prepare receptors and ligands (using either OpenBabel or AutoDock Tools `prepare_receptor` and `prepare_ligand`), here you have some alternatives:
-   - `prep_parallel.py` uses python's `multiprocessing` module to call `prepare_receptor`. `prepare_ligand`, because it is faster, was not parallelized in this way.
-   - Alternatively, use `prepare_ligand` and `prepare_receptor` on the command line directly with your favorite shell concurrency tool such as `xargs` or GNU `parallel`.
+   - Use `prepare_ligand` and `prepare_receptor` on the command line directly with your favorite shell concurrency tool such as `xargs` or GNU `parallel`.
    - Alternatively, use `obabel` with the `-o pdbqt` flag.
 5. Dock to each sample, saving the docking score in the file containing the ligand pose, using `docking_parallel.py`.
 6. Extract scores from these output files and collate them into arrays using `extract_scores.py`
@@ -75,50 +84,60 @@ Note that the docking here is done with either VINA or SMINA, so steps 4, 5, and
 
 ### Frame picking using `pick_align_frames.py`
 
-For the docking below to work as completely independent jobs, we extract frames representing each state, then save them into subdirectories where each subdirectory name corresponds to the MSM state index. Each file name consists of a trajectory index, then a frame index, separated by a dash. Here is an example of frames picked from a 25 state MSM built from five longish trajectories (obtained by calling `tree -v receptor`) output abbreviated for clarity:
+For the docking below to work as completely independent jobs, we extract frames representing each state, then save them into subdirectories where each subdirectory name corresponds to the MSM state index. Each file name consists of a trajectory index, then a frame index, separated by a dash. Here is an example of frames picked from a 25 state MSM built from five longish trajectories (obtained by calling `tree -P '*.pdb' -v receptor`) output abbreviated for clarity:
 
 ```
-receptor/
+receptor
 ├── 0
 │   ├── 0-55257.pdb
-│   ├── 0-55257.pdbqt
 │   ├── 0-56428.pdb
-│   ├── 0-56428.pdbqt
-│   ├── 1-43334.pdb
-│   └── 1-43334.pdbqt
+│   └── 1-43334.pdb
 ├── 1
 │   ├── 2-105110.pdb
-│   ├── 2-105110.pdbqt
 │   ├── 2-175513.pdb
-│   ├── 2-175513.pdbqt
-│   ├── 3-48068.pdb
-│   └── 3-48068.pdbqt
+│   └── 3-48068.pdb
 ├── 2
 │   ├── 0-157652.pdb
-│   ├── 0-157652.pdbqt
 │   ├── 0-158908.pdb
-│   ├── 0-158908.pdbqt
-│   ├── 0-191040.pdb
-│   └── 0-191040.pdbqt
+│   └── 0-191040.pdb
 ...
 └── 24
     ├── 4-24060.pdb
-    ├── 4-24060.pdbqt
     ├── 4-186351.pdb
-    ├── 4-186351.pdbqt
-    ├── 4-189200.pdb
-    └── 4-189200.pdbqt
+    └── 4-189200.pdb
 
-25 directories, 150 files
+25 directories, 75 files
+```
+The commandline I used to create this was:
+
+```
+frame_picker=path/to/PopShift/pick_align_frames.py
+
+python $frame_picker \
+  --find-bonds 1.95,1.35\
+  --make-receptor-sel-chain-A\
+  --assignments dtrajs.h5\
+  --align-resid-list pocket-resids.txt\
+  --number-frames 3\
+  --mapping mapping.json\
+  $system_name\
+  prot_masses.pdb\
+  eq-probs.npy\
+  random\
+  '!hydrogen'\
+  traj_list.txt
 ```
 
-### Preparing Receptors
+Her are the options and arguments, in order:
+- `find-bonds`: Tell frame-picker to find bonds using two different cutoffs, the first for heavy atoms and the second for hydrogen.
+
+To organize subsampling random frames from a trajectory in terms of an MSM one needs to know how many states are in the MSM. This seems like it should be the same number of states that chose/used for clustering, however 
 
 # Docking scripts
 
 ## On preparing receptors and ligands for docking
 
-We prepare each of the receptor conformations as a completely independent system, so it gets its own PDBQT file and can thus be run as an isolated job on whatever hardware is available. This leaves some things to be desired, but as a first pass it's worked for us.
+We prepare each of the receptor conformations as a completely independent system, so each is represented by its own PDBQT file and can thus be run as an isolated job on whatever hardware is available. This leaves some things to be desired, but as a first pass it's worked for us.
 
 In general these scripts are set up to play nicely with one another by assuming that the directory structure of the intermediate files will be maintained--this isn't a hard requirement, but it does keep things convenient. Because we are using other command-line tools to prepare ligands and receptors for docking, we are really just expecting that the prepared files will be in the same place as the files they were prepped from. There are a lot of ways to call a command-line tool on a file such that it writes a new file with the same path but a different file extension. Here are several I have used in the past:
 
