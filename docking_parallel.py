@@ -16,7 +16,7 @@ Using Jug, run docking calculations across a collection of picked and prepped fr
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 """
-from jug import TaskGenerator
+import jug
 from vina import Vina
 import argparse
 import subprocess as sp
@@ -40,7 +40,7 @@ def intrange(s, delim=','):
         raise argparse.ArgumentTypeError('Index ranges must be specified as "start_ind,end_ind"')
 
 
-@TaskGenerator
+@jug.TaskGenerator
 def dock_vina(box_center, box_size, exhaustiveness, receptor_path, ligand_path, output_path):
     v = Vina(sf_name='vina', cpu=exhaustiveness)
     v.set_receptor(str(receptor_path))
@@ -51,7 +51,7 @@ def dock_vina(box_center, box_size, exhaustiveness, receptor_path, ligand_path, 
     return True
 
 
-@TaskGenerator
+@jug.TaskGenerator
 def dock_smina(box_center, box_size, exhaustiveness, receptor_path, ligand_path, output_path):
     return sp.run(['smina', '--receptor', str(receptor_path), '--ligand', str(ligand_path), \
         '--center_x', f'{box_center[0]}', \
@@ -71,7 +71,7 @@ docking_methods = {
     'smina': dock_smina,
 }
 
-if __name__ == '__main__':
+if __name__ == '__main__' or jug.is_jug_running():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('receptor_dir',
@@ -91,7 +91,7 @@ if __name__ == '__main__':
                         help='AutoDock-Vina exhaustiveness parameter. Threads used proportional to this value.')
     parser.add_argument('--protein-prefix', type=str, default='frame00',
                         help='String to prefix output pdbqts with.')
-    parser.add_argument('-d', '--docking_algorithm', default='vina',
+    parser.add_argument('-d', '--docking-algorithm', default='vina',
                         choices=docking_methods.keys(),
                         help='Pick which docking algorithm to use.')
     parser.add_argument('-s', '--symlink-receptors', action=argparse.BooleanOptionalAction,
