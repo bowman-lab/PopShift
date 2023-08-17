@@ -177,7 +177,7 @@ Using [xargs](https://manpages.org/xargs) as an alternative to parallel:
 find frame_picking_system_dir/receptor/ -name '*.pdb' | xargs -I% -n 1 -P 8 obabel -opdbqt % -O %qt
 ```
 
-If only dealing with a few frame-picking runs (or maybe just one) for a relatively parsimonious MSM (one with few states), we can afford to do this sequentially (nicer if you're getting errors, as well). In this case, by far the easiest thing to do is write a simple loop in the shell of your chosing. Here's a while loop that takes advantage of the redirect-to-file from `find` given in the `parallel` example:
+If only dealing with a few frame-picking runs (or maybe just one) for a relatively parsimonious MSM (one with few states), we can afford to do this sequentially (nicer if you're getting errors, as well). In this case, by far the easiest thing to do is write a simple loop in the shell of your choosing. Here's a while loop that takes advantage of the redirect-to-file from `find` given in the `parallel` example:
 
 ```
 while read receptor_path; do
@@ -291,13 +291,37 @@ issue-jug-cmds-dp.sh 'invalidate dock_smina'
 issue-jug-cmds-dp.sh cleanup
 ```
 
-## Analyze results with MSM docking framework
+## Analyze results with PopShift framework
+
+Now we are ready to do something with the per-state affinity and pose estimates we've made. We'll extract the scores, then use them to make affinity estimates.
+
 ### Extract scores
-- Extract scores with `extract_scores.py`
-- help available with `--help`
-- Should be provided each set of docked poses for each ligand as a group.
+
+Extract scores with `extract_scores.py`. This will pull the values of docking scores out of the various pose files and save them to an [`enspara`](https://enspara.readthedocs.io/en/latest/installation.html) ragged array in h5 format, since it is not in general true that the number of frames extracted per bin is always the same. This is a pretty simple tool; here is an example command line:
+
+```
+python path/to/PopShift/extract_scores.py -n 8 -t smina 12xsmina
+```
+The commandline works as follows:
+- `n`: the number of cores to use; this job is pretty I/O bound, but I have found that using a handful of cores can speed it up. 
+- `t`: the type of output file the script can read. Will match the `d` option from `docking_parallel.py`.
+- `12xsmina`: the docking run nickname we would like to run the extraction out of.
+  
+By default, the resulting score extracts will be written to `extracted_scores`, in the same directory as the docking run is in. It takes the path to that directory, then goes up one level. Within `extracted_scores` there will be a dir for each docking run you've extracted, and it will be named to match the directory name for the docking run. There will be an .h5 file within this directory for each ligand name. The elements will correspond to the scores extracted from the pose files.
+
 ### Calculate macroscopic binding constants and reweighted state probabilities
-- `popshift.py` for both binding free energies and reweighted populations.
+
+To obtain binding free energy estimates and reweighted state populations, use `popshift.py`. This program was designed to either be a commandline tool that will perform these analyses on files arranged in the expected way, or as a small module with functions to perform the desired operations, if working within a notebook is desired. Here's an example of command-line usage, but as with all the other tools this one has broader summary documentation provided by the output of the `--help` flag.
+
+```
+extracts=extracted_scores/12xsmina
+python path/to/PopShift/popshift.py -n 8\
+  --out $extracts/binding-calx\
+  --reweighted-eq 1\
+  bin-samples\
+  path/to/eq-probs.npy\
+  $extracts/*.h5
+```
 
 
 ## Dependencies
