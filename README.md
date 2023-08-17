@@ -144,7 +144,7 @@ Here are the options and arguments, in order:
 
 Calling `pick_align_frames.py --help` will provide more information about alternative strategies for picking frames (for example, using just cluster centers, or picking particular numbers of frames from each bin). It's also worth noting that pick_align_frames can be imported into other python sessions, so if you want to rip random frames into sub-trajectories for other reasons this is possible. Finally, note that subsample trajectories that are not PDBs can also be written to disk if desired. This can be nice if trying to use normal trajectory analysis tools on the selected frames, because reading in piles of PDBs instead of one DCD per MSM bin can be annoying and slow.
 
-[^1]: NOTE that the order of `*.xtc`, python's `glob.glob('*.xtc')` python's `pathlib.Path.glob('*.xtc')` and `find . -name '*.xtc'` will not necessarily be consistent across runs. The first of these results in ASCII-betical ordering (meaning that `traj-11.xtc` will come _before_ `traj-2.xtc` for bash and derivative shells). The other three, if unsorted, will come in the file-system's order. Importantly, **the filesystem order can change** if the contents of the filesystem change, which is why many references point out that the returns of such commands--when unsorted explicitly--are arbitrary. This is an easy way for one to shoot oneself in the foot.
+[^1]: The order of `*.xtc`, python's `glob.glob('*.xtc')` python's `pathlib.Path.glob('*.xtc')` and `find . -name '*.xtc'` will not necessarily be consistent across runs. The first of these results in ASCII-betical ordering (meaning that `traj-11.xtc` will come _before_ `traj-2.xtc` for bash and derivative shells). The other three, if unsorted, will come in the file-system's order. Importantly, **the filesystem order can change** if the contents of the filesystem change, which is why many references point out that the returns of such commands--when unsorted explicitly--are arbitrary. This is an easy way for one to shoot oneself in the foot.
 # Docking scripts
 
 ## On preparing receptors and ligands for docking
@@ -221,18 +221,75 @@ jug execute -- path/to/PopShift/docking_parallel.py\
  $receptor_dir/'12xsmina'\
  '0,0,0'\
  '12,12,12'\
- all_ligands/*.pdbqt
+ all-ligands/*.pdbqt
 
 ```
 The SBATCH pragma lines are just asking for a 100 element array job where each job is a one-core job with default everything on the 'all' partition. Obviously you can adjust that if you'd like, but the tool expects to just run single-threaded docking jobs, so there's no point to increasing the per-job core count with the script as written. The command lines are as follows:
-- `jug execute --`: saying this invokes jug instead of the python interpreter, issuing the execute commands. The `--` tells the jug program that the part of the command line it should read is concluded; otherwise, if you have long-option flags thrown that should be going to docking_parallel jug will interpret them as being for it instead.
-- 'd' is the 'docking-algorithm' flag, and picks from the available docking options--at present either `smina` or `vina`.
-- 'e' is the 'exhaustiveness' flag; for vina, the exhaustiveness flag is the number of MC runs to perform.
+- `jug execute --`: saying this invokes jug instead of the python interpreter, issuing the execute command. The `--` tells the jug program that the part of the command line it should read is concluded; if this is omitted and the command line contains long-option flags that should be going to `docking_parallel.py` jug will interpret them as being for it instead.
+- `d` is the 'docking-algorithm' flag, and picks from the available docking options--at present either `smina` or `vina`.
+- `e` is the 'exhaustiveness' flag; for vina, the exhaustiveness flag is the number of MC runs to perform.
 - `$receptor_dir/receptor`: the directory containing the receptor conformations to dock to.
 - `$receptor_dir/12xsmina`: the nickname to give the docking run. It's preferable to keep all the docking runs organized in the same directory to their `receptor` dir for ease of later scripting. 
-- '0,0,0': the coordinates of the center, separated by commas. Note that if you used `pick_align_frames.py` to get receptor structures to dock to, 0,0,0 is a relatively good choice for a center because the coordinates get zeroed by the frame 
- 
-There are other [jug commands](https://jug.readthedocs.io/en/latest/subcommands.html), and often it's
+- `0,0,0`: the coordinates of the center, separated by commas. Note that if you used `pick_align_frames.py` to get receptor structures to dock to, 0,0,0 is a relatively good choice for a center because the coordinates get zeroed by the frame 
+- `12,12,12`: the edge lengths of the x, y, and z edges of the docking box.
+- `all-ligands/*.pdbqt`: the last N arguments should be prepped ligand PDBQTs. I bunged the prepped PDBQTs of the ligands into a directory called `all_ligands`, then provided them to the command-line as a glob. Note that which order the ligands get docked in is not in general important.
+
+### Output
+
+The output from docking will be written into a directory structure that is within a directory given to the nickname for the docking run, with sub-directories using the stem of the file-names of the ligand PDBQTs, and the directory structure beneath that containing numbered directories for each MSM bin, and each docked pose containing _only_ the ligand coordinates will have a file-name matching the receptor structure to which it was docked. So for the above frame-picking example, supposing the ligand files docked in were `benzene.pdbqt`, `toluene.pdbqt`, and `p-xylene`:
+
+```
+tree -d 12xsmina
+├── benzene
+├── p-xylene
+└── toluene
+
+3 directories
+tree 12xsmina/benzene
+benzene
+├── 0
+│   ├── 0-55257.pdbqt
+│   ├── 0-56428.pdbqt
+│   └── 1-43334.pdbqt
+├── 1
+│   ├── 2-105110.pdbqt
+│   ├── 2-175513.pdbqt
+│   └── 3-48068.pdbqt
+├── 2
+│   ├── 0-157652.pdbqt
+│   ├── 0-158908.pdbqt
+│   └── 0-191040.pdbqt
+...
+└── 24
+    ├── 4-24060.pdbqt
+    ├── 4-186351.pdbqt
+    └── 4-189200.pdbqt
+
+25 directories, 75 files
+```
+
+ ### Issuing Jug commands
+There are other [jug commands](https://jug.readthedocs.io/en/latest/subcommands.html). In order to issue them for a jug file that has command line arguments, one must make sure that the same command-line arguments are provided. One must also be using the same versions of python and jug, so its important to have the environment the dock job was launched from active. Thus, often the easiest thing to do is make the sbatch into a script that takes an argument, and inserts that argument in place of `execute`:
+
+```
+#!/bin/bash
+
+receptor_dir=system_name_from_framepicking
+jug $1 -- path/to/PopShift/docking_parallel.py\
+ -d smina\
+ -e 32\
+ $receptor_dir/receptor\
+ $receptor_dir/'12xsmina'\
+ '0,0,0'\
+ '12,12,12'\
+ all-ligands/*.pdbqt
+```
+Call this script `issue-jug-cmds-dp.sh` or similar. I could then use this script to obtain jug status reports, or to invalidate the results of a calculation so that I could rerun it:
+```
+issue-jug-cmds-dp.sh status
+issue-jug-cmds-dp.sh 'invalidate dock_smina'
+issue-jug-cmds-dp.sh cleanup
+```
 
 ## Analyze results with MSM docking framework
 ### Extract scores
