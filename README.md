@@ -8,7 +8,7 @@ these python scripts are designed to be used as command-line tools; some can als
 
 ### Minimal install using `smina` for docking and Openbabel for system prep.
 ```
-# create the analysis postprocessing and framepicking environment
+# create the analysis postprocessing and frame-picking environment
 mamba create -n popshift -c conda-forge obabel loos cython mdtraj 
 mamba activate popshift
 git clone https://github.com/bowman-lab/enspara
@@ -18,7 +18,7 @@ python setup.py install
 mamba create -n smina -c conda-forge smina obabel
 ```
 
-Because of artifical conflicts in `boost` version `loos` and `smina` are currently mutually exclusive in the same env. If either were built as compiled software this issue would not exist, as both are in fact compatible with a wide range of `boost` versions.
+Because of artificial conflicts in `boost` version `loos` and `smina` are currently mutually exclusive in the same env. If either were built as compiled software this issue would not exist, as both are in fact compatible with a wide range of `boost` versions.
 
 ## System preparation programs
 
@@ -45,7 +45,7 @@ right now our scripts are set up to either use [vina](https://vina.scripps.edu/)
 mamba create -n docking -c conda-forge smina vina
 ```
 
-we have run into an issue with using vina from `conda-forge` source; in particular, we found [there was a bug](https://github.com/ccsb-scripps/autodock-vina/issues/90) that produced pretty significant variability in docking scores given the same pose, which is pretty bad for this application where the scores themselves are being used. we also noticed another bug whereby sometimes, seemingly at random across thousands of docking runs, a handful of poses will be given an extra 10-15 kcal/mol of favorability. there are several other energy function bugs on their issue tracker that this could be. until the version on conda forge is greater than `1.2.4` we'd recommend compiling the `develop` branch of [vina hosted on github](https://github.com/ccsb-scripps/autodock-vina), following their install instructions for [building from source](https://autodock-vina.readthedocs.io/en/latest/installation.html#building-from-source), focusing on the python bindings since that's the only part of the install used by `docking_parallel.py`.
+we have run into an issue with using vina from `conda-forge` source; in particular, we found [there was a bug](https://github.com/ccsb-scripps/autodock-vina/issues/90) that produced pretty significant variability in docking scores given the same pose, which is pretty bad for this application where the scores themselves are being used. We also noticed another bug whereby sometimes, seemingly at random across thousands of docking runs, a handful of poses will be given an extra 10-15 kcal/mol of favorability. there are several other energy function bugs on their issue tracker that this could be. until the version on conda forge is greater than `1.2.4` we'd recommend compiling the `develop` branch of [vina hosted on github](https://github.com/ccsb-scripps/autodock-vina), following their install instructions for [building from source](https://autodock-vina.readthedocs.io/en/latest/installation.html#building-from-source), focusing on the python bindings since that's the only part of the install used by `docking_parallel.py`.
 
 note if you are trying to get the right compilers available you can install those from conda forge via the `compilers` repository. here's an example install line:
 ```
@@ -91,7 +91,7 @@ python setup.py install
      - > mamba install -c conda-forge pyemma
 5. LOOS (for `pick_align_frames.py`, `draw_box.py`, `add_bonds_posthoc.py`, and `rmsd_receptor_ligand.py`)
     - > mamba install -c conda-forge loos
-    - Can also be compiled following the instructions on the [loos github](https://github.com/GrossfieldLab/loos)
+    - Can also be compiled following the instructions on the [loos github](https://github.com/GrossfieldLab/loos/blob/main/INSTALL.md)
 
 # Workflows
 
@@ -101,24 +101,24 @@ the scripts provided here are supposed to be modular enough that you can adjust 
 
 in the original popshift ms, we considered how to apply the popshift framework to the ensemble docking problem. the general workflow to actuate that study, with the tool(s) needed, follows:
 
-1. obtain a satisfactory msm representing ligand-free simulations of your receptor.
-2. determine a selection that picks out your pocket of interest.
-3. pick and align frames from the msm using `pick_align_frames.py` to ensure that all the residues that should be in your box are nicely co-aligned.
-   - check that things landed where you expected them to land using a visualizer like `pymol` and `draw_box.py`.
-   - noting that the alignment will recenter the coordinate system of all the models at the centroid of the atoms selected as the 'pocket' atoms, so boxes centered at or close to `0,0,0` are probably good choices in general.
-4. prepare receptors and ligands (using either openbabel or autodock tools `prepare_receptor` and `prepare_ligand`), here you have some alternatives:
-   - use `prepare_ligand` and `prepare_receptor` on the command line directly with your favorite shell concurrency tool such as `xargs` or gnu `parallel`.
-   - alternatively, use `obabel` with the `-o pdbqt` flag.
-5. dock to each sample, saving the docking score in the file containing the ligand pose, using `docking_parallel.py`.
-6. extract scores from these output files and collate them into arrays using `extract_scores.py`
-7. use the score arrays to do popshift calculations, with `popshift.py`
-8. plot stuff, compare to experiments, and generally *go nuts*, by reading the json that `popshift.py` outputs into your downstream scripts or notebooks.
+1. Obtain a satisfactory msm representing ligand-free simulations of your receptor.
+2. Determine a selection that picks out your pocket of interest.
+3. Pick and align frames from the msm using `pick_align_frames.py` to ensure that all the residues that should be in your box are nicely co-aligned.
+   - Check that things landed where you expected them to land using a visualizer like `pymol` and `draw_box.py`.
+   - Noting that the alignment will recenter the coordinate system of all the models at the centroid of the atoms selected as the 'pocket' atoms, so boxes centered at or close to `0,0,0` are probably good choices in general.
+4. Prepare receptors and ligands (using either openbabel or autodock tools `prepare_receptor` and `prepare_ligand`), here you have some alternatives:
+   - Use `prepare_ligand` and `prepare_receptor` on the command line directly with your favorite shell concurrency tool such as `xargs` or gnu `parallel`.
+   - Alternatively, use `obabel` with the `-o pdbqt` flag.
+5. Dock to each sample, saving the docking score in the file containing the ligand pose, using `docking_parallel.py`.
+6. Extract scores from these output files and collate them into arrays using `extract_scores.py`
+7. Use the score arrays to do popshift calculations, with `popshift.py`
+8. Plot stuff, compare to experiments, and generally **have too much fun**, by reading the json that `popshift.py` outputs into your downstream scripts or notebooks.
 
-note that the docking here is done with either vina or smina, so steps 4, 5, and 6 are somewhat particular to how those codes do that. you can of course color outside of the lines here, but you'll probably be adding some functionality to the scripts we have in order to do so.
+Note that the docking here is done with either vina or smina, so steps 4, 5, and 6 are somewhat particular to how those codes do that. You can of course color outside of the lines here, but you'll probably be adding some functionality to the scripts we have in order to do so. The things `popshift.py` needs are an array of affinity assessments that correspond to conformational bins and an array of estimates for the probability of those bins with no ligand present.
 
-### frame picking using `pick_align_frames.py`
+### Frame picking using `pick_align_frames.py`
 
-for the docking below to work as completely independent jobs, we extract frames representing each state, then save them into subdirectories where each subdirectory name corresponds to the msm state index. each file name consists of a trajectory index, then a frame index, separated by a dash. here is an example of frames picked from a 25 state msm built from five longish trajectories (obtained by calling `tree -p '*.pdb' -v receptor`) output abbreviated for clarity:
+For the docking below to work as completely independent jobs, we extract frames representing each state, then save them into subdirectories where each subdirectory name corresponds to the msm state index. Each file name consists of a trajectory index, then a frame index, separated by a dash. Here is an example of frames picked from a 25 state msm built from five longish trajectories (obtained by calling `tree -p '*.pdb' -v receptor`) output abbreviated for clarity:
 
 ```
 receptor
@@ -142,7 +142,7 @@ receptor
 
 25 directories, 75 files
 ```
-the commandline i used to create this was:
+The command line I used to create this was:
 
 ```
 frame_picker=path/to/popshift/pick_align_frames.py
@@ -162,32 +162,32 @@ python $frame_picker \
   traj_list.txt
 ```
 
-here are the options and arguments, in order:
-- `find-bonds`: find bonds using two different cutoffs, the first for heavy atoms and the second for hydrogen. not necessary if bonds are present in the file used for 'model'. better to have bonds written into pdbs so that the prep program doesn't need to build them.
-- `make-receptor-sel-chain-a`: make the written pdbs have chain a identification. some system prep tools require this.
-- `assignments`: the assignments or discretized trajectory file, saved as a 'ragged array. alternatively, an array of center indices saved as a `.npy`. to subsample randomly the full assignments file is obligatory, and **the order of the trajectories in the assignments file and the coordinate trajectory paths must match**.[^1]
-- `align-resid-list`: this expects a text-file that `numpy.genfromtxt` can turn into a 1-d array of `int`s. these correspond to the `resid`s from the model that should be used in the iterative alignment. 
+Here are the options and arguments, in order:
+- `find-bonds`: find bonds using two different cutoffs, the first for heavy atoms and the second for hydrogen. Not necessary if bonds are present in the file used for 'model'. Better to have bonds written into pdbs so that the prep program doesn't need to build them.
+- `make-receptor-sel-chain-a`: make the written pdbs have chain a identification. Some system prep tools require this.
+- `assignments`: the assignments or discretized trajectory file, saved as a 'ragged array. alternatively, an array of center indices saved as a `.npy`. To subsample randomly the full assignments file is obligatory, and **the order of the trajectories in the assignments file and the coordinate trajectory paths must match**.[^1]
+- `align-resid-list`: this expects a text-file that `numpy.genfromtxt` can turn into a 1-d array of `int`s. These correspond to the `resid`s from the model that should be used in the iterative alignment. 
 - `number-frames`: select this many frames from each msm bin.
 - `mapping`: this corresponds to an enspara-style 'to' trim mapping; a dictionary containing the indexes of the original assignments trajectories as keys and the indexes they should be mapped to after ergodic trimming as values.
 - `system_name`: the name you'd like to give to this particular extraction. will become the directory name within which the `receptor` dir containing the tree of selected frames is written.
-- `prot_masses.pdb`: this is the model file. for this particular command i was using a `prot_masses.pdb` generated by gromacs, which means it doesn't have connectivity which is why the example also contains `find-bonds`.
-- `eq-probs.npy`: a numpy array containing equilibrium probabilities. could also be a pyemma msm saved as a pickle file, in which case `mapping` would not have been necessary. used to communicate to the script how many states are active.
-- `random`: the sampling mode requested here randomly picks frames from each msm bin without replacement. there are other options; consult the help statement. `centers` will switch the tool to operating on the provided coordinate trajectory as a centers trajectory.
-- `!hydrogen`: the [loos selection string](https://grossfieldlab.github.io/loos/selections.html) to apply to the residues selected as the pocket for the purposes of alignment. this string means 'not hydrogen', or in other words 'all heavy atoms'.
-- `traj_list.txt`: a text file containing paths to the coordinate trajectoies frames should be extracted from. a sequence of at least one paths may also be provided here, but as previously mentioned **the order of the trajectories in the assignments file and the coordinate trajectory paths must match**. because of this i much prefer to create a list of trajectories and save it as a text file when i cluster, then pass that list around to subsequent tools. if operating in centers mode then this argument should be a path to the trajectory of centers.
+- `prot_masses.pdb`: this is the model file. For this particular command I was using a `prot_masses.pdb` generated by gromacs, which means it doesn't have connectivity which is why the example also contains `find-bonds`.
+- `eq-probs.npy`: a numpy array containing equilibrium probabilities. Could also be a pyemma MSM saved as a pickle file, in which case `mapping` would not have been necessary. Used to communicate to the script how many states are active.
+- `random`: the sampling mode requested here randomly picks frames from each msm bin without replacement. There are other options; consult the help statement. `centers` will switch the tool to operating on the provided coordinate trajectory as a centers trajectory.
+- `!hydrogen`: the [loos selection string](https://grossfieldlab.github.io/loos/selections.html) to apply to the residues selected as the pocket for the purposes of alignment. This string means 'not hydrogen', or in other words 'all heavy atoms'.
+- `traj_list.txt`: a text file containing paths to the coordinate trajectoies frames should be extracted from. A sequence of at least one paths may also be provided here, but as previously mentioned **the order of the trajectories in the assignments file and the coordinate trajectory paths must match**.[^1] because of this I much prefer to create a list of trajectories and save it as a text file when I cluster, then pass that list around to subsequent tools. If operating in centers mode then this argument should be a path to the trajectory of centers.
 
-calling `pick_align_frames.py --help` will provide more information about alternative strategies for picking frames (for example, using just cluster centers, or picking particular numbers of frames from each bin). it's also worth noting that pick_align_frames can be imported into other python sessions, so if you want to rip random frames into sub-trajectories for other reasons this is possible. finally, note that subsample trajectories that are not pdbs can also be written to disk if desired. this can be nice if trying to use normal trajectory analysis tools on the selected frames, because reading in piles of pdbs instead of one dcd per msm bin can be annoying and slow.
+Calling `pick_align_frames.py --help` will provide more information about alternative strategies for picking frames (for example, using just cluster centers, or picking particular numbers of frames from each bin). It's also worth noting that pick_align_frames can be imported into other python sessions, so if you want to rip random frames into sub-trajectories for other reasons this is possible. Finally, note that subsample trajectories that are not PDBs can also be written to disk if desired. This can be nice if trying to use normal trajectory analysis tools on the selected frames, because reading in piles of PDBs instead of one dcd per msm bin can be annoying and slow.
 
-[^1]: the order of `*.xtc`, python's `glob.glob('*.xtc')` python's `pathlib.path.glob('*.xtc')` and `find . -name '*.xtc'` will not necessarily be consistent across runs. the first of these results in ascii-betical ordering (meaning that `traj-11.xtc` will come _before_ `traj-2.xtc` for bash and derivative shells). the other three, if unsorted, will come in the file-system's order. importantly, **the filesystem order can change** if the contents of the filesystem change, which is why many references point out that the returns of such commands--when unsorted explicitly--are arbitrary. this is an easy way for one to shoot oneself in the foot.
+[^1]: the order of `*.xtc`, python's `glob.glob('*.xtc')` python's `pathlib.path.glob('*.xtc')` and `find . -name '*.xtc'` will not necessarily be consistent across runs. The first of these results in ascii-betical ordering (meaning that `traj-11.xtc` will come _before_ `traj-2.xtc` for bash and derivative shells). The other three, if unsorted, will come in the file-system's order. Importantly, **the filesystem order can change** if the contents of the filesystem change, which is why many references point out that the returns of such commands--when unsorted explicitly--are arbitrary. This is an easy way for one to shoot oneself in the foot.
 # Docking scripts
 
 ## Preparing receptors and ligands for docking
 
 we prepare each of the receptor conformations as a completely independent system, so each is represented by its own pdbqt file and can thus be run as an isolated job on whatever hardware is available. this leaves some things to be desired, but as a first pass it's worked for us.
 
-in general these scripts are set up to play nicely with one another by assuming that the directory structure of the intermediate files will be maintained--this isn't a hard requirement, but it does keep things convenient. because we are using other command-line tools to prepare ligands and receptors for docking, we are really just expecting that the prepared files will be in the same place as the files they were prepped from. there are a lot of ways to call a command-line tool on a file such that it writes a new file with the same path but a different file extension. here are several i have used in the past:
+In general these scripts are set up to play nicely with one another by assuming that the directory structure of the intermediate files will be maintained--this isn't a hard requirement, but it does keep things convenient. Because we are using other command-line tools to prepare ligands and receptors for docking, we are really just expecting that the prepared files will be in the same place as the files they were prepped from. There are a lot of ways to call a command-line tool on a file such that it writes a new file with the same path but a different file extension. Here are several I have used in the past:
 
-using gnu parallel:
+Using gnu parallel:
 
 ```
 # use find to get the paths rel. to cwd;
@@ -197,21 +197,21 @@ find frame_picking_system_dir/receptor/ -name '*.pdb' > receptor_paths.txt
 parallel -j 8 obabel -opdbqt {} -o {}qt :::: receptor_paths.txt
 ```
 
-or with `prepare_receptor`:
+Or with `prepare_receptor`:
 
 ```
 parallel -j 8 prepare_receptor -r {} -o {}qt :::: receptor_paths.txt
 ```
 
-what's going on here? scrutinizing the docs for [parallel](https://www.gnu.org/software/parallel/parallel_tutorial.html) suggests that parallel will be running the commandline on each of the elements in the file when in `::::` input mode. it substitutes each line into the 'command line' you provide as an argument wherever the curly braces are, then runs that as its own subprocess.
+What's going on here? Scrutinizing the docs for [parallel](https://www.gnu.org/software/parallel/parallel_tutorial.html) suggests that parallel will be running the commandline on each of the elements in the file when in `::::` input mode. It substitutes each line into the 'command line' you provide as an argument wherever the curly braces are, then runs that as its own subprocess.
 
-using [xargs](https://manpages.org/xargs) as an alternative to parallel:
+Using [xargs](https://manpages.org/xargs) as an alternative to parallel:
 
 ```
 find frame_picking_system_dir/receptor/ -name '*.pdb' | xargs -i% -n 1 -p 8 obabel -opdbqt % -o %qt
 ```
 
-if only dealing with a few frame-picking runs (or maybe just one) for a relatively parsimonious msm (one with few states), we can afford to do this sequentially (nicer if you're getting errors, as well). in this case, by far the easiest thing to do is write a simple loop in the shell of your choosing. here's a while loop that takes advantage of the redirect-to-file from `find` given in the `parallel` example:
+If only dealing with a few frame-picking runs (or maybe just one) for a relatively parsimonious msm (one with few states), we can afford to do this sequentially (nicer if you're getting errors, as well). In this case, by far the easiest thing to do is write a simple loop in the shell of your choosing. Here's a while loop that takes advantage of the redirect-to-file from `find` given in the `parallel` example:
 
 ```
 while read receptor_path; do
@@ -220,25 +220,25 @@ while read receptor_path; do
 done < receptor_paths.txt
 ```
 
-### preparing ligands
+### Preparing ligands
 
-ligands can also be prepped by command-line tools; the docking script `docking_parallel.py` expects you to provide the ligands as either a text-file of ligand paths or as a series of command-line arguments. as such, you can organize these files how you see fit. i usually put them in their own directory, then prep 'everything' with a certain file extension within that directory. so for example:
+Ligands can also be prepped by command-line tools; the docking script `docking_parallel.py` expects you to provide the ligands as either a text-file of ligand paths or as a series of command-line arguments. As such, you can organize these files how you see fit. I usually put them in their own directory, then prep 'everything' with a certain file extension within that directory. So for example:
 
 ```
 # assume there's a directory called ligands with .sdf or .mol2 files in it
 parallel -j 8 obabel {} -h -isdf -opdbqt -o{.}.pdbqt ::: ligands/*.sdf
 ```
-note: the `-h` flag adds hydrogens. don't throw it if you don't want that.
+Note: the `-h` flag adds hydrogens. Don't throw it if you don't want that.
 
-alternatively, if you have the adfr suite installed and would like to use `prepare_ligand` instead of openbabel (note you need `.mol2` or `.pdb` files for `prepare_ligand`, as of this writing):
+Alternatively, if you have the ADFR suite installed and would like to use `prepare_ligand` instead of openbabel (note you need `.mol2` or `.pdb` files for `prepare_ligand`, as of this writing):
 
 ```
 parallel -j 8 prepare_ligand -l {} -ahydrogens -o{.}.pdbqt ::: ligands/*.mol2
 ```
 
-## docking using jug
+## Docking using Jug
 
-again here there are many ways to organize docking so long as the docking code is available on the command-line. we like to use jug, because it integrates well with our workload manager (slurm). we have also used it with lsf. following is an example sbatch script, with comments about the various options for docking paprallel.
+Again here there are many ways to organize docking so long as the docking code is available on the command-line. We like to use jug, because it integrates well with our workload manager (slurm). We have also used it with lsf. Following is an example sbatch script, with comments about the various options for `docking_paprallel.py`
 ```
 #!/bin/bash
 #sbatch --array=0-99
@@ -258,19 +258,19 @@ jug execute -- path/to/popshift/docking_parallel.py\
  all-ligands/*.pdbqt
 
 ```
-the sbatch pragma lines are just asking for a 100 element array job where each job is a one-core job with default everything on the 'all' partition. obviously you can adjust that if you'd like, but the tool expects to just run single-threaded docking jobs, so there's no point to increasing the per-job core count with the script as written. the command lines are as follows:
+The sbatch pragma lines are just asking for a 100 element array job where each job is a one-core job with default everything on the 'all' partition. obviously you can adjust that if you'd like, but the tool expects to just run single-threaded docking jobs, so there's no point to increasing the per-job core count with the script as written. the command lines are as follows:
 - `jug execute --`: saying this invokes jug instead of the python interpreter, issuing the execute command. the `--` tells the jug program that the part of the command line it should read is concluded; if this is omitted and the command line contains long-option flags that should be going to `docking_parallel.py` jug will interpret them as being for it instead.
 - `d` is the 'docking-algorithm' flag, and picks from the available docking options--at present either `smina` or `vina`.
 - `e` is the 'exhaustiveness' flag; for vina, the exhaustiveness flag is the number of mc runs to perform.
 - `$receptor_dir/receptor`: the directory containing the receptor conformations to dock to.
-- `$receptor_dir/12xsmina`: the nickname to give the docking run. it's preferable to keep all the docking runs organized in the same directory to their `receptor` dir for ease of later scripting. 
-- `0,0,0`: the coordinates of the center, separated by commas. note that if you used `pick_align_frames.py` to get receptor structures to dock to, 0,0,0 is a relatively good choice for a center because the coordinates get zeroed by the frame 
+- `$receptor_dir/12xsmina`: the nickname to give the docking run. It's preferable to keep all the docking runs organized in the same directory to their `receptor` dir for ease of later scripting. 
+- `0,0,0`: the coordinates of the center, separated by commas. Note that if you used `pick_align_frames.py` to get receptor structures to dock to, 0,0,0 is a relatively good choice for a center because the coordinates get zeroed by the frame.
 - `12,12,12`: the edge lengths of the x, y, and z edges of the docking box.
-- `all-ligands/*.pdbqt`: the last n arguments should be prepped ligand pdbqts. i bunged the prepped pdbqts of the ligands into a directory called `all_ligands`, then provided them to the command-line as a glob. note that which order the ligands get docked in is not in general important.
+- `all-ligands/*.pdbqt`: the last n arguments should be prepped ligand PDBQTs. I bunged the prepped PDBQTs of the ligands into a directory called `all_ligands`, then provided them to the command-line as a glob. Note that which order the ligands get docked in is not in general important.
 
 ### output
 
-the output from docking will be written into a directory structure that is within a directory given to the nickname for the docking run, with sub-directories using the stem of the file-names of the ligand pdbqts, and the directory structure beneath that containing numbered directories for each msm bin, and each docked pose containing _only_ the ligand coordinates will have a file-name matching the receptor structure to which it was docked. so for the above frame-picking example, supposing the ligand files docked in were `benzene.pdbqt`, `toluene.pdbqt`, and `p-xylene`:
+The output from docking will be written into a directory structure that is within a directory given to the nickname for the docking run, with sub-directories using the stem of the file-names of the ligand pdbqts, and the directory structure beneath that containing numbered directories for each msm bin, and each docked pose containing _only_ the ligand coordinates will have a file-name matching the receptor structure to which it was docked. So for the above frame-picking example, supposing the ligand files docked in were `benzene.pdbqt`, `toluene.pdbqt`, and `p-xylene`:
 
 ```
 tree -d 12xsmina
@@ -302,8 +302,8 @@ benzene
 25 directories, 75 files
 ```
 
- ### issuing jug commands
-there are other [jug commands](https://jug.readthedocs.io/en/latest/subcommands.html). in order to issue them for a jug file that has command line arguments, one must make sure that the same command-line arguments are provided. one must also be using the same versions of python and jug, so its important to have the environment the dock job was launched from active. thus, often the easiest thing to do is make the sbatch into a script that takes an argument, and inserts that argument in place of `execute`:
+ ### Issuing jug commands
+There are other [jug commands](https://jug.readthedocs.io/en/latest/subcommands.html). In order to issue them for a jug file that has command line arguments, one must make sure that the same command-line arguments are provided. One must also be using the same versions of python and jug, so its important to have the environment the dock job was launched from active. Thus, often the easiest thing to do is make the sbatch into a script that takes an argument, and inserts that argument in place of `execute`:
 
 ```
 #!/bin/bash
@@ -318,34 +318,34 @@ jug $1 -- path/to/popshift/docking_parallel.py\
  '12,12,12'\
  all-ligands/*.pdbqt
 ```
-call this script `issue-jug-cmds-dp.sh` or similar. i could then use this script to obtain jug status reports, or to invalidate the results of a calculation so that i could rerun it:
+Call this script `issue-jug-cmds-dp.sh` or similar. I could then use this script to obtain jug status reports, or to invalidate the results of a calculation so that I could rerun it:
 ```
 issue-jug-cmds-dp.sh status
 issue-jug-cmds-dp.sh 'invalidate dock_smina'
 issue-jug-cmds-dp.sh cleanup
 ```
 
-## analyze results with popshift framework
+## Analyze results with PopShift framework
 
-now we are ready to do something with the per-state affinity and pose estimates we've made. we'll extract the scores, then use them to make affinity estimates.
+Now we are ready to do something with the per-state affinity and pose estimates we've made. We'll extract the scores, then use them to make affinity estimates.
 
-### extract scores
+### Extract scores
 
-extract scores with `extract_scores.py`. this will pull the values of docking scores out of the various pose files and save them to an [`enspara`](https://enspara.readthedocs.io/en/latest/installation.html) ragged array in h5 format, since it is not in general true that the number of frames extracted per bin is always the same. this is a pretty simple tool; here is an example command line:
+Extract scores with `extract_scores.py`. This will pull the values of docking scores out of the various pose files and save them to an [`enspara`](https://enspara.readthedocs.io/en/latest/installation.html) ragged array in h5 format, since it is not in general true that the number of frames extracted per bin is always the same. This is a pretty simple tool; here is an example command line:
 
 ```
 python path/to/popshift/extract_scores.py -n 8 -t smina 12xsmina
 ```
 the commandline works as follows:
-- `n`: the number of cores to use; this job is pretty i/o bound, but i have found that using a handful of cores can speed it up. 
-- `t`: the type of output file the script can read. will match the `d` option from `docking_parallel.py`.
+- `n`: the number of cores to use; this job is pretty i/o bound, but I have found that using a handful of cores can speed it up. 
+- `t`: the type of output file the script can read. Will match the `d` option from `docking_parallel.py`.
 - `12xsmina`: the docking run nickname we would like to run the extraction out of.
   
-by default, the resulting score extracts will be written to `extracted_scores`, in the same directory as the docking run is in. it takes the path to that directory, then goes up one level. within `extracted_scores` there will be a dir for each docking run you've extracted, and it will be named to match the directory name for the docking run. there will be an .h5 file within this directory for each ligand name. the elements will correspond to the scores extracted from the pose files.
+By default, the resulting score extracts will be written to `extracted_scores`, in the same directory as the docking run is in. It takes the path to that directory, then goes up one level. Within `extracted_scores` there will be a dir for each docking run you've extracted, and it will be named to match the directory name for the docking run. There will be an `.h5` file within this directory for each ligand file name. The elements will correspond to the scores extracted from the pose files.
 
-### calculate macroscopic binding constants and reweighted state probabilities
+### Calculate macroscopic binding constants and reweighted state probabilities
 
-to obtain binding free energy estimates and reweighted state populations, use `popshift.py`. this program was designed to either be a commandline tool that will perform these analyses on files arranged in the expected way, or as a small module with functions to perform the desired operations, if working within a notebook is desired. here's an example of command-line usage, but as with all the other tools this one has broader summary documentation provided by the output of the `--help` flag.
+To obtain binding free energy estimates and reweighted state populations, use `popshift.py`. This program was designed to either be a commandline tool that will perform these analyses on files arranged in the expected way, or as a small module with functions to perform the desired operations, if working within a notebook is desired. Here's an example of command-line usage, but as with all the other tools this one has broader summary documentation provided by the output of the `--help` flag.
 
 ```
 extracts=extracted_scores/12xsmina
@@ -358,13 +358,13 @@ python path/to/popshift/popshift.py \
   $extracts/*.h5
 ```
 
-the commandline works as follows:
+The commandline works as follows:
 - `n`: number of threads--this code has `python mutltiprocessing` style threads, but unless one has huge numbers of ligands tasks are so fast using this threading is imperceptably different.
 - `out`: the output path to write the affinity calculation json and any reweighted free energy (ragged) arrays to.
-- `reweighted-eq`: the concentration of ligand you'd like to reweight your equilibrium probabilities by; here i've chosen 1m to simulate 'saturating' ligand conditions. note that reweighted probabilities will be per frame sampled, not per bin--they'll match the shape of the extracted scores arrays.
-- `bin-samples`: the mode frame picking was performed in. should match the argument to `pick_align_frames.py`.
+- `reweighted-eq`: the concentration of ligand you'd like to reweight your equilibrium probabilities by; here I've chosen 1M to simulate 'saturating' ligand conditions. Note that reweighted probabilities will be per frame sampled, not per bin--they'll match the shape of the extracted scores arrays.
+- `bin-samples`: the mode frame picking was performed in. Should match the argument to `pick_align_frames.py`.
 - `path/to/eq-probs.npy`: the equilibrium probabilities for the apo simulations used throughout.
-- `$extracts/*.h5`: the extracted scores, in no particular order. assumes the stem of the path to each score `.h5` is the name of the ligand, for keying and naming its output.
+- `$extracts/*.h5`: the extracted scores, in no particular order. Assumes the stem of the path to each score `.h5` is the name of the ligand, for keying and naming its output.
 
 Because the output is matched to the extracted scores, I like to write to a sub-directory of the extracted scores directory. If reweighted free energies were not requested, then only the scores post processing will be written. Three types of files may be created inside the directory provided as an arg to `--out`. One `calx.json` with the results of the affinity analysis inside it; one `{ligand_name}-eq_probs.h5` file with reweighted equilibrium probabilities corresponding to each _conformation_ analyzed. This array will have the same shape as the extracted scores arrays. There will also be a difference in population array, saved as a change in free energy per state between the frame weights and the reweights. In other words a $\Delta G$ per state from the initial population to the reweighted population. These values will be saved in a file called `{ligand_name}-dg.h5`. 
 
