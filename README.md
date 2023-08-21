@@ -325,17 +325,18 @@ python path/to/PopShift/popshift.py \
 ```
 
 The commandline works as follows:
-- `n`: number of cores. The stuff popshift is doing is really fast, so honestly not throwing this flag and just doing it ST will be indescernably different unless you have a monstrous number of states.
-- `out`: the directory to write the various output files of the script to.
-- `reweighted-eq`: the concentration of ligand you'd like to reweight your equilibrium probabilities by; here I've chosen 1M to simulate 'saturating' ligand conditions.
-- `bin-samples`: the calculation type done earlier, eg in frame-picking. `popshift.py` needs to know what to expect from the score arrays you feed it.
-- `eq-probs.npy`: the apo equilibrium probabilities from the original msm.
+- `n`: number of threads--this code has `python mutltiprocessing` style threads, but unless one has huge numbers of ligands tasks are so fast using this threading is imperceptably different.
+- `out`: the output path to write the affinity calculation JSON and any reweighted free energy (ragged) arrays to.
+- `reweighted-eq`: the concentration of ligand you'd like to reweight your equilibrium probabilities by; here I've chosen 1M to simulate 'saturating' ligand conditions. Note that reweighted probabilities will be per frame sampled, not per bin--they'll match the shape of the extracted scores arrays.
+- `bin-samples`: the mode frame picking was performed in. Should match the argument to `pick_align_frames.py`.
+- `path/to/eq-probs.npy`: The equilibrium probabilities for the apo simulations used throughout.
 - `$extracts/*.h5`: the extracted scores, in no particular order. Assumes the stem of the path to each score `.h5` is the name of the ligand, for keying and naming its output.
 
 The output of the script will be a JSON with several different averages reported for each ligand, alongside a log. It's been indented to make it more human readable, but importantly the standard python json module can turn it into a dictionary of dictionaries and lists with no special commands, so you can also inspect or plot its contents in a python interpreter or notebook to your heart's content. 
 
 Within the 'results' object, there will be ligand names associated to sub-objects, each of which will have several different keys for various values. 
 
+Because the output is matched to the extracted scores, I like to write to a sub-directory of the extracted scores directory. If reweighted free energies were not requested, then only the scores post processing will be written. The output will be saved as a file called `calx.json`. If you read it in using python's JSON module it will become a dictionary of dictionaries; the 'results' key will be a dictionary keyed by ligand names with values that are themselves dictionaries with each of the type of calculations pop-shift can use to aggregate a binding site into a macroscopic dissocation constant. These are the 'popshift' free energy with the provided kT, the 'best score', the 'simple average', and the 'weighted average', which corresponds to the expectation over apo equilibrium probabilities we previously referred to as 'boltzmann docking'.
 ## Dependencies
 1. ADFR suite (for `prep_parallel.py` and `prepare_ligand.py`)
     - > https://ccsb.scripps.edu/adfr/downloads/  
