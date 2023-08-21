@@ -315,7 +315,8 @@ To obtain binding free energy estimates and reweighted state populations, use `p
 
 ```
 extracts=extracted_scores/12xsmina
-python path/to/PopShift/popshift.py -n 8\
+python path/to/PopShift/popshift.py \
+  -n 8\
   --out $extracts/binding-calx\
   --reweighted-eq 1\
   bin-samples\
@@ -323,6 +324,17 @@ python path/to/PopShift/popshift.py -n 8\
   $extracts/*.h5
 ```
 
+The commandline works as follows:
+- `n`: number of cores. The stuff popshift is doing is really fast, so honestly not throwing this flag and just doing it ST will be indescernably different unless you have a monstrous number of states.
+- `out`: the directory to write the various output files of the script to.
+- `reweighted-eq`: the concentration of ligand you'd like to reweight your equilibrium probabilities by; here I've chosen 1M to simulate 'saturating' ligand conditions.
+- `bin-samples`: the calculation type done earlier, eg in frame-picking. `popshift.py` needs to know what to expect from the score arrays you feed it.
+- `eq-probs.npy`: the apo equilibrium probabilities from the original msm.
+- `$extracts/*.h5`: the extracted scores, in no particular order. Assumes the stem of the path to each score `.h5` is the name of the ligand, for keying and naming its output.
+
+The output of the script will be a JSON with several different averages reported for each ligand, alongside a log. It's been indented to make it more human readable, but importantly the standard python json module can turn it into a dictionary of dictionaries and lists with no special commands, so you can also inspect or plot its contents in a python interpreter or notebook to your heart's content. 
+
+Within the 'results' object, there will be ligand names associated to sub-objects, each of which will have several different keys for various values. 
 
 ## Dependencies
 1. ADFR suite (for `prep_parallel.py` and `prepare_ligand.py`)
