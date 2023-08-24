@@ -136,7 +136,7 @@ def kcal_mol_from_kd(kd, rt):
 
 
 # reductions below here
-def msm_binding_dG(frame_weights, trimmed_binding_fes, rt):
+def one_site_popshift(frame_weights, trimmed_binding_fes, rt):
     rtn = -rt
     return rtn * np.log(np.sum(frame_weights * np.exp(trimmed_binding_fes / rtn)))
 
@@ -154,15 +154,15 @@ def best_score(trimmed_binding_fes):
 
 
 def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath, lengths=None):
-    msm_binding = msm_binding_dG(frame_weights, trimmed_fes, rt)
+    one_site_ps = one_site_popshift(frame_weights, trimmed_fes, rt)
     # kd, scaled by user-supplied conversion.
-    kd = kd_from_kcal_mol(msm_binding, rt) * kd_scale
+    kd = kd_from_kcal_mol(one_site_ps, rt) * kd_scale
     if reweighted_eq:
         # convert trimmed Free energies to association constants
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
         reweights = reweighted_frames(frame_weights, kas, conc_ligand=reweighted_eq)
         fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
-        ra.save(str(outpath/(tag+'-fe.h5')),
+        ra.save(str(outpath/(tag+'-dg.h5')),
                 ra.RaggedArray(fe_per_state, lengths=lengths))
         ra.save(str(outpath/(tag+'-eq_probs.h5')),
                 ra.RaggedArray(reweights, lengths=lengths))
@@ -170,8 +170,8 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, ou
     simple = simple_avg(trimmed_fes)
     best = best_score(trimmed_fes)
     return {
-        'msm dG': float(msm_binding),
-        'msm K_D': float(kd),
+        'popshift dG': float(one_site_ps),
+        'popshift K_D': float(kd),
         'weighted avg': float(weighted),
         'simple avg': float(simple),
         'best score': float(best)
