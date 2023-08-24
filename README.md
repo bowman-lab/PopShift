@@ -103,20 +103,20 @@ in the original popshift ms, we considered how to apply the popshift framework t
 
 1. Obtain a satisfactory msm representing ligand-free simulations of your receptor.
 2. Determine a selection that picks out your pocket of interest.
-3. Pick and align frames from the msm using `pick_align_frames.py` to ensure that all the residues that should be in your box are nicely co-aligned.
+3. [Pick and align frames](#frame-picking-using-pick_align_framespy) from the msm using `pick_align_frames.py` to ensure that all the residues that should be in your box are nicely co-aligned. If working from the [minimal set-up](#minimal-install-using-smina-for-docking-and-openbabel-for-system-prep), use the `popshift` environment.
    - Check that things landed where you expected them to land using a visualizer like `pymol` and `draw_box.py`.
    - Noting that the alignment will recenter the coordinate system of all the models at the centroid of the atoms selected as the 'pocket' atoms, so boxes centered at or close to `0,0,0` are probably good choices in general.
-4. Prepare receptors and ligands (using either openbabel or autodock tools `prepare_receptor` and `prepare_ligand`), here you have some alternatives:
+4. [Prepare receptors and ligands](#preparing-receptors-and-ligands-for-docking) (using either openbabel or autodock tools `prepare_receptor` and `prepare_ligand`), here you have some alternatives:
    - Use `prepare_ligand` and `prepare_receptor` on the command line directly with your favorite shell concurrency tool such as `xargs` or gnu `parallel`.
-   - Alternatively, use `obabel` with the `-o pdbqt` flag.
-5. Dock to each sample, saving the docking score in the file containing the ligand pose, using `docking_parallel.py`.
-6. Extract scores from these output files and collate them into arrays using `extract_scores.py`
-7. Use the score arrays to do popshift calculations, with `popshift.py`
+   - Alternatively, use `obabel` with the `-o pdbqt` flag. In the [minimal set-up](#minimal-install-using-smina-for-docking-and-openbabel-for-system-prep) use the `smina` environment.
+5. [Dock to each sample](#docking-using-jug), saving the docking score in the file containing the ligand pose, using `docking_parallel.py`. In the [minimal set-up](#minimal-install-using-smina-for-docking-and-openbabel-for-system-prep) use the `smina` env.
+6. [Extract scores](#extract-scores) from these output files and collate them into arrays using `extract_scores.py`. In the [minimal set-up](#minimal-install-using-smina-for-docking-and-openbabel-for-system-prep) use the `popshift` env.
+7. Use the score arrays to do [popshift calculations](#calculate-macroscopic-binding-constants-and-reweighted-state-probabilities), with `popshift.py`. Also use the `popshift` env for this.
 8. Plot stuff, compare to experiments, and generally **have too much fun**, by reading the json that `popshift.py` outputs into your downstream scripts or notebooks.
 
 Note that the docking here is done with either vina or smina, so steps 4, 5, and 6 are somewhat particular to how those codes do that. You can of course color outside of the lines here, but you'll probably be adding some functionality to the scripts we have in order to do so. The things `popshift.py` needs are an array of affinity assessments that correspond to conformational bins and an array of estimates for the probability of those bins with no ligand present.
 
-### Frame picking using `pick_align_frames.py`
+# Frame picking using `pick_align_frames.py`
 
 For the docking below to work as completely independent jobs, we extract frames representing each state, then save them into subdirectories where each subdirectory name corresponds to the msm state index. Each file name consists of a trajectory index, then a frame index, separated by a dash. Here is an example of frames picked from a 25 state msm built from five longish trajectories (obtained by calling `tree -p '*.pdb' -v receptor`) output abbreviated for clarity:
 
