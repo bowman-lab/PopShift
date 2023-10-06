@@ -96,6 +96,11 @@ def expand_bin_weights(eq_probs, lengths):
     )
 
 
+# undoes what expand_bin_weights does. 
+def deflate_bin_weights(frame_weights):
+    return np.array([np.sum(x) for x in frame_weights])
+
+
 # takes a ragged array of scores, a ragged array of
 def filter_trim_binding_fes(binding_fes, active_states, stride, ra_assigns):
     trimmed_binding_fes = np.array(
@@ -155,12 +160,23 @@ def best_score(trimmed_binding_fes):
 
 def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath, lengths=None):
     one_site_ps = one_site_popshift(frame_weights, trimmed_fes, rt)
+    if lengths is not None:
+        # recover eq for top-cluster calculation:
+        r_fes = ra.RaggedArray(trimmed_fes, lengths=lengths)
+        r_eq = ra.RaggedArray(frame_weights, lengths=lengths)
+        apo_eq = deflate_bin_weights(r_eq)
+        tops = np.array([np.min(x) for x in r_fes])
+        top_cluster_ps = one_site_popshift(apo_eq, tops, rt)
+    else:
+        top_cluster_ps = one_site_ps
+        
     # kd, scaled by user-supplied conversion.
     kd = kd_from_kcal_mol(one_site_ps, rt) * kd_scale
     if reweighted_eq:
         # convert trimmed Free energies to association constants
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
-        reweights = reweighted_frames(frame_weights, kas, conc_ligand=reweighted_eq)
+        reweights = reweighted_frames(
+            frame_weights, kas, conc_ligand=reweighted_eq)
         fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
         ra.save(str(outpath/(tag+'-dg.h5')),
                 ra.RaggedArray(fe_per_state, lengths=lengths))
@@ -171,6 +187,7 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, ou
     best = best_score(trimmed_fes)
     return {
         'popshift dG': float(one_site_ps),
+        'popshift best per cluster': float(top_cluster_ps),
         'popshift K_D': float(kd),
         'weighted avg': float(weighted),
         'simple avg': float(simple),
