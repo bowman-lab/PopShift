@@ -25,6 +25,20 @@ import loos
 from loos import pyloos
 from sys import argv
 import re
+import spyrmsd
+import numpy as np
+
+
+def atomic_group_to_adjacency(ag: loos.AtomicGroup):
+    n = len(ag)
+    adjacency = np.zeros((n, n), dtype=int)
+    # maybe there's a more efficient way to do this, but this seemed easier
+    for i, at in enumerate(ag):
+        # assuming that the atom IDs don't have a gap and start at 1
+        bi = np.array(at.getBonds(), dtype=int) - 1
+        adjacency[i][bi] = 1
+    return adjacency
+
 
 
 def get_meta_from_path(ligp):
@@ -129,7 +143,7 @@ if __name__ == '__main__':
     if args.ref_receptor_sel:
         ref_receptor_sel = args.ref_receptor_sel + subset_str
     ref_ligand_sel = args.ref_ligand_sel + subset_str
-
+    
     # make selections before trajectory loops.
     ligpose_full = loos.createSystem(str(args.poses[0]))
     ligpose = loos.selectAtoms(ligpose_full, ligand_sel)
