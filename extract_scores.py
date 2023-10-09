@@ -149,14 +149,24 @@ if __name__ == '__main__':
                                            key=result_sorter)
                                     for state_path in state_paths]
                 extracted_results = pool.map(extractor, result_paths)
+                problem_states = []
                 for i, result in enumerate(extracted_results):
+                    if result.size == 0:  # no elements means some extration failed
+                        problem_path = result_paths[i][0].parent
+                        print(problem_path)
+                        problem_states.append(problem_path)
                     if len(result) != 1:
                         print(result_paths[i], result)
                 outpre = out_path / ligand_path.stem
                 # Need to disable error checking in order to avoid a version bug issue.
                 r = ra.RaggedArray(extracted_results, error_checking=False)
-                ra.save(str(outpre.with_suffix('.h5')), r)
-                with outpre.with_suffix('.pickle').open('wb') as f:
-                    pickle.dump(result_paths, f)
+                if problem_states:
+                    problems_out = (out_path / (ligand_path.stem + '-problems')).with_suffix('.txt')
+                    print('There were issues extracting scores from some paths. See:', problems_out)
+                    problems_out.write_text('\n'.join(map(str, problem_states)))
+                else:
+                    ra.save(str(outpre.with_suffix('.h5')), r)
+                    with outpre.with_suffix('.pickle').open('wb') as f:
+                        pickle.dump(result_paths, f)
 
 pool.close()
