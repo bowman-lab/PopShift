@@ -25,7 +25,7 @@ import loos
 from loos import pyloos
 from sys import argv
 import re
-import spyrmsd
+from spyrmsd import rmsd
 import numpy as np
 
 
@@ -39,6 +39,21 @@ def atomic_group_to_adjacency(ag: loos.AtomicGroup):
         adjacency[i][bi] = 1
     return adjacency
 
+
+def get_atomic_nums(ag: loos.AtomicGroup, model_path:Path, informat='pdb'):
+    from openbabel import openbabel
+    mol = openbabel.OBMol()
+    conv = openbabel.OBConversion()
+    conv.SetInFormat(informat)
+    conv.ReadFile(mol, str(model_path))
+    atomic_nums = []
+    # note that for openbabel the atom id is (apparently) the zeros based
+    # ordering of the group of atoms within a molecule, whereas for LOOS (and the PDB)
+    # this would be an atom index, and the 'id' is a field in the data file.
+    for lat in ag:
+        obat = mol.GetAtomById(lat.index())
+        atomic_nums.append(obat.GetAtomicNum())
+    return np.array(atomic_nums, dtype=int)
 
 
 def get_meta_from_path(ligp):
@@ -119,6 +134,8 @@ if __name__ == '__main__':
                         'those of receptor-sel.')
     p.add_argument('--poses', '-P', type=Path, nargs='+', required=True,
                    help='Ligand poses in order matched to receptor conformations.')
+    p.add_argument('--spyrmsd', action=argparse.BooleanOptionalAction, default=True,
+                   help='If thrown, compute spyrmsd using software from Meli and Biggin, DOI:10.1186/s13321-020-00455-2')
     p.add_argument('sample_model', type=Path,
                    help='A model file that can be used to read the samples.')
     p.add_argument('ref_complex', type=Path,
@@ -147,6 +164,10 @@ if __name__ == '__main__':
     # make selections before trajectory loops.
     ligpose_full = loos.createSystem(str(args.poses[0]))
     ligpose = loos.selectAtoms(ligpose_full, ligand_sel)
+    if not ligpose.hasBonds():
+        ligpose.findBonds(1.85)
+    pose_adjacency = atomic_group_to_adjacency(ligpose)
+    ligpose_anums = get_atomic_nums(ligpose, args.poses[0])
     samplec_full = loos.createSystem(str(args.samples[0]))
     samplec = loos.selectAtoms(samplec_full, pocket_sel)
     samplec_ca = loos.selectAtoms(samplec, 'name == "CA"')
@@ -161,6 +182,12 @@ if __name__ == '__main__':
     samplec = reductively_unify_ags(samplec, ref_complex)
     ref_complex_ca = loos.selectAtoms(ref_complex, 'name == "CA"')
     ref_ligand = loos.selectAtoms(ref_complex_full, ref_ligand_sel)
+    if not ref_ligand.hasBonds():
+        ref_ligand.findBonds(1.85)
+    ref_ligand_path = args.ref_complex.parent / ('ligand-' + args.ref_complex.name)
+    ref_ligand_path.write_text(str(loos.PDB.fromAtomicGroup(ref_ligand)))
+    ref_anums = get_atomic_nums(ref_ligand, ref_ligand_path)
+    ref_adjacency = atomic_group_to_adjacency(ref_ligand)
 
     outlist = [{} for i in range(len(set(x.parent.name for x in args.poses)))]
     lig_traj = pyloos.VirtualTrajectory(*map(
@@ -192,6 +219,20 @@ if __name__ == '__main__':
             rmsd_rec = samplec.rmsd(ref_complex)
             rmsd_ca = samplec_ca.rmsd(ref_complex_ca)
             rmsd_lig = ligpose.rmsd(ref_ligand)
+            if args.spyrmsd:
+                coords_ref = ref_ligand.getCoords()
+                coords = ligpose.getCoords()
+                lig_symm_rmsd = rmsd.symmrmsd(
+                    coords_ref,
+                    coords,
+                    ref_anums,
+                    ligpose_anums,
+                    ref_adjacency,
+                    pose_adjacency,
+                    minimize=False
+                )
+            else:
+                lig_symm_rmsd = None
             bin_index, sample = get_meta_from_path(posep)
             if args.extract_score:
                 score = get_ligand_affinity(posep)
@@ -201,7 +242,8 @@ if __name__ == '__main__':
                 'receptor': rmsd_rec,
                 'receptor CA': rmsd_ca,
                 'ligand': rmsd_lig,
-                'score': score
+                'score': score,
+                'ligand-symmrmsd': lig_symm_rmsd
             }
             if args.write_complex_prefix:
                 out_ag = ligpose_full + samplec_full + ref_complex_full
