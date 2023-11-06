@@ -29,7 +29,8 @@ def coordreader(s, delim=','):
         x, y, z = map(float, s.split(delim))
         return x, y, z
     except:
-       raise argparse.ArgumentTypeError("Center-coordinates and dimensions must be specified as 'x,y,z'")
+        raise argparse.ArgumentTypeError(
+            "Center-coordinates and dimensions must be specified as 'x,y,z'")
 
 
 def intrange(s, delim=','):
@@ -37,7 +38,36 @@ def intrange(s, delim=','):
         start_ind, end_ind = map(int, s.split(delim))
         return start_ind, end_ind
     except:
-        raise argparse.ArgumentTypeError('Index ranges must be specified as "start_ind,end_ind"')
+        raise argparse.ArgumentTypeError(
+            'Index ranges must be specified as "start_ind,end_ind"')
+
+
+plantsconfig_template = """
+# scoring function and search settings
+scoring_function chemplp
+search_speed speed1
+
+
+# input
+protein_file {receptor}
+ligand_file {ligand}
+aco_ants 40
+
+# output
+output_dir {output_dir}
+
+# write single mol2 files (e.g. for RMSD calculation)
+write_multi_mol2 0
+
+# binding site definition
+bindingsite_center {binding_center}
+bindingsite_radius {binding_radius}
+
+
+# cluster algorithm
+cluster_structures 10
+cluster_rmsd 2.0
+"""
 
 
 @jug.TaskGenerator
@@ -53,32 +83,48 @@ def dock_vina(box_center, box_size, exhaustiveness, receptor_path, ligand_path, 
 
 @jug.TaskGenerator
 def dock_smina(box_center, box_size, exhaustiveness, receptor_path, ligand_path, output_path):
-    return sp.run(['smina', '--receptor', str(receptor_path), '--ligand', str(ligand_path), \
-        '--center_x', f'{box_center[0]}', \
-        '--center_y', f'{box_center[1]}', \
-        '--center_z', f'{box_center[2]}', \
-        '--size_x', f'{box_size[0]}', \
-        '--size_y', f'{box_size[1]}', \
-        '--size_z', f'{box_size[2]}', \
-        '--exhaustiveness', f'{exhaustiveness}', \
-        '--cpu', '1', \
-        '--num_modes','1', \
-        '--out', str(output_path)])
+    return sp.run(['smina', '--receptor', str(receptor_path), '--ligand', str(ligand_path),
+                   '--center_x', f'{box_center[0]}',
+                   '--center_y', f'{box_center[1]}',
+                   '--center_z', f'{box_center[2]}',
+                   '--size_x', f'{box_size[0]}',
+                   '--size_y', f'{box_size[1]}',
+                   '--size_z', f'{box_size[2]}',
+                   '--exhaustiveness', f'{exhaustiveness}',
+                   '--cpu', '1',
+                   '--num_modes', '1',
+                   '--out', str(output_path)])
+
+
+@jug.TaskGenerator
+def dock_plants(plants_exe_path, binding_center, binding_radius, receptor_path, ligand_path, output_path, plants_template, **kwargs):
+    outdir = output_path.parent/'plants'
+    outdir.mkdir(parents=True, exist_ok=True)
+    plantsfile = outdir/'plantsconfig'
+    binding_center_str = ' '.join(map(str, binding_center))
+    plantsfile.write_text(plants_template.format(binding_center=binding_center_str, binding_radius=binding_radius,
+                          receptor=receptor_path, ligand=ligand_path, output_dir=(outdir/'results'), **kwargs))
+    plants_exit = sp.run(
+        f"{plants_exe_path} --mode screen {plantsfile}".split())
+    return sp.run((f'smina -r {receptor_path} -l {ligand_path} --center_x {binding_center[0]} --center_y '
+                  f'{binding_center[1]} --center_z {binding_center[2]}').split())
 
 
 docking_methods = {
     'vina': dock_vina,
     'smina': dock_smina,
+    'plants': dock_plants
 }
 
 if __name__ == '__main__' or jug.is_jug_running():
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('receptor_dir',
                         help='Path to protein directory')
     parser.add_argument('out_dir',
                         help='Path to the output. By convention, the name of the docking run including info like box size '
-                            'if multiple are being tested.')
+                        'if multiple are being tested.')
     parser.add_argument('box_center', type=coordreader,
                         help='Comma delimited string listing x,y,z of box center. If x is negative start with backslash ("\-5,5,3")')
     parser.add_argument('box_size', type=coordreader,
@@ -101,7 +147,6 @@ if __name__ == '__main__' or jug.is_jug_running():
     parser.add_argument('--dry-run', action=argparse.BooleanOptionalAction,
                         help="If thrown, don't actually run docking; just create directories and (optionally) symlinks.")
 
-
     args = parser.parse_args()
     if len(args.ligand_list) == 1:
         ligand_list_path = Path(args.ligand_list[0])
@@ -116,7 +161,8 @@ if __name__ == '__main__' or jug.is_jug_running():
     # Figure out whether we need to index them by replica count.
     if args.replicas:
         start_ind, end_ind = args.replicas
-        output_paths = [Path(args.out_dir + '-{}'.format(r)) for r in range(start_ind, end_ind)]
+        output_paths = [Path(args.out_dir + '-{}'.format(r))
+                        for r in range(start_ind, end_ind)]
     else:
         output_paths = [Path(args.out_dir)]
 
@@ -127,14 +173,14 @@ if __name__ == '__main__' or jug.is_jug_running():
     # uses recursive glob. Must be sorted to get same order across runs.
     frame_paths = sorted(path_receptor.rglob('*.pdbqt'))
 
-
     for run_path in output_paths:
         for ligand in ligand_paths:
             lig_path = Path(ligand)
             ligand_name = lig_path.stem
             lig_output_path = run_path / ligand_name
             for frame_path in frame_paths:
-                docked_lig_path = lig_output_path.joinpath(*frame_path.parts[-2:])
+                docked_lig_path = lig_output_path.joinpath(
+                    *frame_path.parts[-2:])
                 docked_dir_path = docked_lig_path.parent
                 if not docked_dir_path.is_dir():
                     docked_dir_path.mkdir(exist_ok=True, parents=True)
@@ -147,4 +193,3 @@ if __name__ == '__main__' or jug.is_jug_running():
                         lig_path,
                         docked_lig_path
                     )
-
