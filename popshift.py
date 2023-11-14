@@ -357,6 +357,7 @@ def run_cli(raw_args=None):
         log['command line'].append(argv)
 
     log['rt'] = rt
+    log['K_D scale'] = args.K_D_scale
     binding_output['log'] = log
     # get results from this set of input
     new_results = args.func(args, rt)
