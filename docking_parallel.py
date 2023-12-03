@@ -194,7 +194,7 @@ if __name__ == '__main__' or jug.is_jug_running():
     # if docking using SMINA, get pdbqts; otherwise, use mol2s, and prep docking function
     if args.docking_algorithm == 'plants':
         if args.plants_path.is_file():
-            plants_functor = jug.TaskGenerator(plants_docker(plants_exe_path=args.plants_path, plants_template=plantsconfig_template, smina=args.rescore_smina))
+            plants_functor = plants_docker(plants_exe_path=args.plants_path, plants_template=plantsconfig_template, smina=args.rescore_smina)
             docking_methods['plants'] = plants_functor
         else:
             print(f'ERROR: Plants path is {args.plants_path}, which is not a file.')
@@ -214,11 +214,11 @@ if __name__ == '__main__' or jug.is_jug_running():
                 if not docked_dir_path.is_dir():
                     docked_dir_path.mkdir(exist_ok=True, parents=True)
                 if not args.dry_run:
-                    docking_methods[args.docking_algorithm](
+                    jug.Task(docking_methods[args.docking_algorithm](
                         args.box_center,
                         args.box_size,
                         args.exhaustiveness,
                         frame_path,
                         lig_path,
                         docked_lig_path
-                    )
+                    ))
