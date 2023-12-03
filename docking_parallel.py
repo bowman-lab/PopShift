@@ -130,7 +130,7 @@ class plants_docker:
 docking_methods = {
     'vina': dock_vina,
     'smina': dock_smina,
-    'plants': dock_plants
+    'plants': None
 }
 
 if __name__ == '__main__' or jug.is_jug_running():
@@ -159,6 +159,8 @@ if __name__ == '__main__' or jug.is_jug_running():
                         help='Pick which docking algorithm to use.')
     parser.add_argument('--plants-path', default=None, type=Path,
                         help='If docking with plants, provide plants path.')
+    parser.add_argument('--rescore-smina', default=True, action=argparse.BooleanOptionalAction,
+                        help='If docking with PLANTS, rescore the best pose with SMINA.')
     parser.add_argument('-s', '--symlink-receptors', action=argparse.BooleanOptionalAction,
                         help='Create relative symlinks for receptor PDBs into each docked ligand dir.')
     parser.add_argument('-t', '--top-dir', type=Path, default=Path.cwd(),
@@ -192,7 +194,8 @@ if __name__ == '__main__' or jug.is_jug_running():
     # if docking using SMINA, get pdbqts; otherwise, use mol2s, and prep docking function
     if args.docking_algorithm == 'plants':
         if args.plants_path.is_file():
-            dock_function = partial(docking_methods[args.docking_algorithm], args.plants_path)
+            plants_functor = plants_docker(plants_exe_path=args.plants_path, plants_template=plantsconfig_template, smina=args.rescore_smina)
+            docking_methods['plants'] = plants_functor
         else:
             print(f'ERROR: Plants path is {args.plants_path}, which is not a file.')
             exit(1)
