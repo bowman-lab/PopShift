@@ -104,16 +104,16 @@ class plants_docker:
         self.plants_template = plants_template
         self.smina = smina
 
-    @jug.TaskGenerator    
     def __call__(self, binding_center, box_size, receptor_path, ligand_path, output_path, **kwargs):
         plants_dir = output_path.parent/'plants'
         plants_dir.mkdir(parents=True, exist_ok=True)
-        plants_conf = plants_dir/'plantsconfig'
+        plants_conf_p = plants_dir/'plantsconfig'
         plants_out = plants_dir/'results'
         binding_center_str = ' '.join(map(str, binding_center))
-        plants_conf.write_text(self.plants_template.format(binding_center=binding_center_str, binding_radius=box_size[0]/2,
-                            receptor=receptor_path, ligand=ligand_path, output_dir=plants_out, **kwargs))
-        plants_exit = sp.run(f"{self.plants_exe_path} --mode screen {plants_conf}".split())
+        plants_conf = self.plants_template.format(binding_center=binding_center_str, binding_radius=box_size[0]/2,
+                            receptor=receptor_path, ligand=ligand_path, output_dir=plants_out, **kwargs)
+        plants_conf_p.write_text(plants_conf)
+        plants_exit = sp.run(f"{self.plants_exe_path} --mode screen {plants_conf_p}".split())
         # This gets the highest ranking pose, of 10
         plants_pose = next(plants_out.glob('*entry_*_conf_01.mol2'))
         if self.smina:
@@ -194,7 +194,7 @@ if __name__ == '__main__' or jug.is_jug_running():
     # if docking using SMINA, get pdbqts; otherwise, use mol2s, and prep docking function
     if args.docking_algorithm == 'plants':
         if args.plants_path.is_file():
-            plants_functor = plants_docker(plants_exe_path=args.plants_path, plants_template=plantsconfig_template, smina=args.rescore_smina)
+            plants_functor = jug.TaskGenerator(plants_docker(plants_exe_path=args.plants_path, plants_template=plantsconfig_template, smina=args.rescore_smina))
             docking_methods['plants'] = plants_functor
         else:
             print(f'ERROR: Plants path is {args.plants_path}, which is not a file.')
