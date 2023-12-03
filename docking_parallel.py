@@ -217,7 +217,6 @@ if __name__ == '__main__' or jug.is_jug_running():
                     jug.Task(docking_methods[args.docking_algorithm](
                         args.box_center,
                         args.box_size,
-                        args.exhaustiveness,
                         frame_path,
                         lig_path,
                         docked_lig_path
