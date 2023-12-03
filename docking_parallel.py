@@ -99,39 +99,32 @@ def dock_smina(box_center, box_size, exhaustiveness, receptor_path, ligand_path,
 
 # make a functor to hold plants exe and plants template.
 class plants_docker:
-    def __init__(self, plants_exe_path, plants_template):
+    def __init__(self, plants_exe_path, plants_template, smina=False):
         self.plants_exe_path = plants_exe_path
         self.plants_template = plants_template
-    
-    def __call__(binding_center, box_size, receptor_path, ligand_path, output_path, **kwargs):
-        outdir = output_path.parent/'plants'
-        outdir.mkdir(parents=True, exist_ok=True)
-        plantsfile = outdir/'plantsconfig'
+        self.smina = smina
+
+    @jug.TaskGenerator    
+    def __call__(self, binding_center, box_size, receptor_path, ligand_path, output_path, **kwargs):
+        plants_dir = output_path.parent/'plants'
+        plants_dir.mkdir(parents=True, exist_ok=True)
+        plants_conf = plants_dir/'plantsconfig'
+        plants_out = plants_dir/'results'
         binding_center_str = ' '.join(map(str, binding_center))
-        plantsfile.write_text(self.plants_template.format(binding_center=binding_center_str, binding_radius=box_size[0]/2,
-                            receptor=receptor_path, ligand=ligand_path, output_dir=(outdir/'results'), **kwargs))
-        plants_exit = sp.run(f"{self.plants_exe_path} --mode screen {plantsfile}".split())
-        plants_pose = oudir/'results/'
-        smina_exit = sp.run((f'smina -r {receptor_path} -l {ligand_path} --center_x {binding_center[0]} --center_y '`
-                    f'{binding_center[1]} --center_z {binding_center[2]}').split())
-        return plants_exit, smina_exit
+        plants_conf.write_text(self.plants_template.format(binding_center=binding_center_str, binding_radius=box_size[0]/2,
+                            receptor=receptor_path, ligand=ligand_path, output_dir=plants_out, **kwargs))
+        plants_exit = sp.run(f"{self.plants_exe_path} --mode screen {plants_conf}".split())
+        # This gets the highest ranking pose, of 10
+        plants_pose = next(plants_out.glob('*entry_*_conf_01.mol2'))
+        if self.smina:
+            if plants_exit.returncode != 0:
+                print('Plants failed:', plants_dir)
+                return plants_exit
+            smina_out = output_path.parent/'smina-min.out'
+            smina_exit = sp.run(f'smina -r {receptor_path} -l {plants_pose} -o {output_path} --minimize --accurate_line | tee {smina_out}'.split())
+            return smina_exit
+        return plants_exit
 
-
-
-
-@jug.TaskGenerator
-def dock_plants(plants_exe_path, binding_center, binding_radius, receptor_path, ligand_path, output_path, plants_template, **kwargs):
-    outdir = output_path.parent/'plants'
-    outdir.mkdir(parents=True, exist_ok=True)
-    plantsfile = outdir/'plantsconfig'
-    binding_center_str = ' '.join(map(str, binding_center))
-    plantsfile.write_text(plants_template.format(binding_center=binding_center_str, binding_radius=binding_radius,
-                          receptor=receptor_path, ligand=ligand_path, output_dir=(outdir/'results'), **kwargs))
-    plants_exit = sp.run(f"{plants_exe_path} --mode screen {plantsfile}".split())
-    plants_pose = oudir/'results/'
-    smina_exit = sp.run((f'smina -r {receptor_path} -l {ligand_path} --center_x {binding_center[0]} --center_y '`
-                  f'{binding_center[1]} --center_z {binding_center[2]}').split())
-    return plants_exit, smina_exit
 
 
 docking_methods = {
