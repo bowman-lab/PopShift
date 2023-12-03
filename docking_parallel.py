@@ -21,6 +21,7 @@ from vina import Vina
 import argparse
 import subprocess as sp
 from pathlib import Path
+from functools import partial
 
 
 def coordreader(s, delim=','):
@@ -96,6 +97,28 @@ def dock_smina(box_center, box_size, exhaustiveness, receptor_path, ligand_path,
                    '--out', str(output_path)])
 
 
+# make a functor to hold plants exe and plants template.
+class plants_docker:
+    def __init__(self, plants_exe_path, plants_template):
+        self.plants_exe_path = plants_exe_path
+        self.plants_template = plants_template
+    
+    def __call__(binding_center, box_size, receptor_path, ligand_path, output_path, **kwargs):
+        outdir = output_path.parent/'plants'
+        outdir.mkdir(parents=True, exist_ok=True)
+        plantsfile = outdir/'plantsconfig'
+        binding_center_str = ' '.join(map(str, binding_center))
+        plantsfile.write_text(self.plants_template.format(binding_center=binding_center_str, binding_radius=box_size[0]/2,
+                            receptor=receptor_path, ligand=ligand_path, output_dir=(outdir/'results'), **kwargs))
+        plants_exit = sp.run(f"{self.plants_exe_path} --mode screen {plantsfile}".split())
+        plants_pose = oudir/'results/'
+        smina_exit = sp.run((f'smina -r {receptor_path} -l {ligand_path} --center_x {binding_center[0]} --center_y '`
+                    f'{binding_center[1]} --center_z {binding_center[2]}').split())
+        return plants_exit, smina_exit
+
+
+
+
 @jug.TaskGenerator
 def dock_plants(plants_exe_path, binding_center, binding_radius, receptor_path, ligand_path, output_path, plants_template, **kwargs):
     outdir = output_path.parent/'plants'
@@ -104,10 +127,11 @@ def dock_plants(plants_exe_path, binding_center, binding_radius, receptor_path, 
     binding_center_str = ' '.join(map(str, binding_center))
     plantsfile.write_text(plants_template.format(binding_center=binding_center_str, binding_radius=binding_radius,
                           receptor=receptor_path, ligand=ligand_path, output_dir=(outdir/'results'), **kwargs))
-    plants_exit = sp.run(
-        f"{plants_exe_path} --mode screen {plantsfile}".split())
-    return sp.run((f'smina -r {receptor_path} -l {ligand_path} --center_x {binding_center[0]} --center_y '
+    plants_exit = sp.run(f"{plants_exe_path} --mode screen {plantsfile}".split())
+    plants_pose = oudir/'results/'
+    smina_exit = sp.run((f'smina -r {receptor_path} -l {ligand_path} --center_x {binding_center[0]} --center_y '`
                   f'{binding_center[1]} --center_z {binding_center[2]}').split())
+    return plants_exit, smina_exit
 
 
 docking_methods = {
@@ -140,6 +164,8 @@ if __name__ == '__main__' or jug.is_jug_running():
     parser.add_argument('-d', '--docking-algorithm', default='vina',
                         choices=docking_methods.keys(),
                         help='Pick which docking algorithm to use.')
+    parser.add_argument('--plants-path', default=None, type=Path,
+                        help='If docking with plants, provide plants path.')
     parser.add_argument('-s', '--symlink-receptors', action=argparse.BooleanOptionalAction,
                         help='Create relative symlinks for receptor PDBs into each docked ligand dir.')
     parser.add_argument('-t', '--top-dir', type=Path, default=Path.cwd(),
@@ -170,6 +196,13 @@ if __name__ == '__main__' or jug.is_jug_running():
     for p in output_paths:
         p.mkdir(exist_ok=True, parents=True)
 
+    # if docking using SMINA, get pdbqts; otherwise, use mol2s, and prep docking function
+    if args.docking_algorithm == 'plants':
+        if args.plants_path.is_file():
+            dock_function = partial(docking_methods[args.docking_algorithm], args.plants_path)
+        else:
+            print(f'ERROR: Plants path is {args.plants_path}, which is not a file.')
+            exit(1)
     # uses recursive glob. Must be sorted to get same order across runs.
     frame_paths = sorted(path_receptor.rglob('*.pdbqt'))
 
