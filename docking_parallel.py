@@ -99,16 +99,22 @@ def dock_smina(box_center, box_size, exhaustiveness, receptor_path, ligand_path,
 
 # make a functor to hold plants exe and plants template.
 class plants_docker:
-    def __init__(self, plants_exe_path, plants_template, smina=False):
+    def __init__(self, plants_exe_path, plants_template, smina=False, overwrite=True):
         self.plants_exe_path = plants_exe_path
         self.plants_template = plants_template
         self.smina = smina
+        self.force = overwrite
 
     def __call__(self, binding_center, box_size, receptor_path, ligand_path, output_path, **kwargs):
         plants_dir = output_path.parent/'plants'
         plants_dir.mkdir(parents=True, exist_ok=True)
         plants_conf_p = plants_dir/'plantsconfig'
         plants_out = plants_dir/'results'
+        if self.overwrite:
+            if plants_out.is_dir():
+                for filepath in plants_out.iterdir():
+                    filepath.unlink()
+                plants_out.rmdir()
         binding_center_str = ' '.join(map(str, binding_center))
         plants_conf = self.plants_template.format(binding_center=binding_center_str, binding_radius=box_size[0]/2,
                             receptor=receptor_path, ligand=ligand_path, output_dir=plants_out, **kwargs)
@@ -117,6 +123,7 @@ class plants_docker:
         # This gets the highest ranking pose, of 10
         plants_pose = next(plants_out.glob('*entry_*_conf_01.mol2'))
         if self.smina:
+            print('re-minimizing with smina:', plants_pose)
             if plants_exit.returncode != 0:
                 print('Plants failed:', plants_dir)
                 return plants_exit
