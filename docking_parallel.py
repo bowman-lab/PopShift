@@ -103,15 +103,15 @@ class plants_docker:
         self.plants_exe_path = plants_exe_path
         self.plants_template = plants_template
         self.smina = smina
-        self.force = overwrite
+        self.overwrite = overwrite
 
     def __call__(self, binding_center, box_size, receptor_path, ligand_path, output_path, **kwargs):
         plants_dir = output_path.parent/'plants'
         plants_dir.mkdir(parents=True, exist_ok=True)
         plants_conf_p = plants_dir/'plantsconfig'
         plants_out = plants_dir/'results'
-        if self.overwrite:
-            if plants_out.is_dir():
+        if plants_out.is_dir():
+            if self.overwrite:
                 for filepath in plants_out.iterdir():
                     filepath.unlink()
                 plants_out.rmdir()
