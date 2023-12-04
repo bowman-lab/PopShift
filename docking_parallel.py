@@ -112,14 +112,19 @@ class plants_docker:
         plants_out = plants_dir/'results'
         if plants_out.is_dir():
             if self.overwrite:
-                for filepath in plants_out.iterdir():
-                    filepath.unlink()
+                print(Path.cwd())
+                for plants_outfile in plants_out.iterdir():
+                    plants_outfile.unlink()
                 plants_out.rmdir()
         binding_center_str = ' '.join(map(str, binding_center))
-        plants_conf = self.plants_template.format(binding_center=binding_center_str, binding_radius=box_size[0]/2,
-                            receptor=receptor_path, ligand=ligand_path, output_dir=plants_out, **kwargs)
+        # write conf such that plants can be run from plants_out as cwd.
+        plants_conf = self.plants_template.format(binding_center=binding_center_str, 
+                                                  binding_radius=box_size[0]/2, 
+                                                  receptor=receptor_path.resolve(), 
+                                                  ligand=ligand_path.resolve(), 
+                                                  output_dir=plants_out.name, **kwargs)
         plants_conf_p.write_text(plants_conf)
-        plants_exit = sp.run(f"{self.plants_exe_path} --mode screen {plants_conf_p}".split())
+        plants_exit = sp.run(f"{self.plants_exe_path} --mode screen {plants_conf_p.name}".split(), cwd=plants_conf_p.parent)
         # This gets the highest ranking pose, of 10
         plants_pose = next(plants_out.glob('*entry_*_conf_01.mol2'))
         if self.smina:
