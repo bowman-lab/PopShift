@@ -112,10 +112,8 @@ class plants_docker:
         plants_out = plants_dir/'results'
         if plants_out.is_dir():
             if self.overwrite:
-                print(Path.cwd())
-                for plants_outfile in plants_out.iterdir():
-                    plants_outfile.unlink()
-                plants_out.rmdir()
+                rm_exit = sp.run(f'rm -r {plants_out}'.split())
+                print(rm_exit, flush=True)
         binding_center_str = ' '.join(map(str, binding_center))
         # write conf such that plants can be run from plants_out as cwd.
         plants_conf = self.plants_template.format(binding_center=binding_center_str, 
