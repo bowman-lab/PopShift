@@ -5,7 +5,8 @@ import openmm as mm
 from pathlib import Path
 import loos
 import pickle
-
+from enspara import ra
+import numpy as np
 import argparse as ap
 
 
@@ -44,8 +45,10 @@ def get_energy_from_coords(simulation: Simulation,
     simulation.context.setPositions(traj_ag.getCoords()*u.angstroms)
     if minimize:
         simulation.minimizeEnergy(tolerance=0.001)
-    state = simulation.context.getState(getEnergy=True)
-    return state.getPotentialEnergy().value_in_unit(u.kilocalories_per_mole) * u.kilocalories_per_mole
+    state = simulation.context.getState(getEnergy=True, getPositions=True)
+    energy =  state.getPotentialEnergy().value_in_unit(u.kilocalories_per_mole) * u.kilocalories_per_mole
+    positions = state.getPositions(asNumpy=True)
+    return energy, positions
 
 
 def save_conf_pdb(omt: mm.app.Topology, simulation: Simulation, outpre: Path, suffix: str):
@@ -77,9 +80,10 @@ p.add_argument('receptor_dir', type=Path,
                help='Path to directory containing the conformations to use as receptor conformations (expected to be PDBs).')
 p.add_argument('ligand_conf', type=Path,
                help='Path to coordinates of ligand. Order of atoms must match top and sys files.')
-p.add_argument('ligand_paths', type=Path,
+p.add_argument('pose_paths', type=Path,
                help='Pickle file containing coordinates of ligand poses (from extract_scores.py).')
-
+p.add_argument('out_scores', type=Path,
+               help="h5 file with enspara RA containing scores in the same order as the docking scores extracted with popshift.")
 p.add_argument('--minimize', action=ap.BooleanOptionalAction, default=True,
                help='If switched to "no-minimize", will not minimize structure before GB calculation.')
 p.add_argument('--outconf-prefix', type=Path, default=None,
@@ -94,30 +98,43 @@ ligand_ag = loos.createSystem(str(args.ligand_conf))
 with args.ligand_paths.open('rb') as f:
     ligand_paths = pickle.load(f)
 
+lengths = [len(state_ps) for state_ps in ligand_paths]
+total = sum(lengths)
 complex_sim, complex_top = get_setup(args.serialized_params, 'complex')
-receptor_sim, receptor_top = get_setup(
-    args.serialized_params, 'receptor')
+receptor_sim, receptor_top = get_setup(args.serialized_params, 'receptor')
 ligand_sim, ligand_top = get_setup(args.serialized_params, 'ligand')
 print('Loaded OpenMM systems. Getting ready to do energy evaluations', flush=True)
-for ligand_poses in ligand_paths:
+score_array = ra.RaggedArray(np.zeros(total), lengths=lengths)
+for i, ligand_poses in enumerate(ligand_paths):
     ligand_traj = vtraj_by_filename(ligand_poses, ligand_ag)
     # change the paths to get receptor dir paths, from ligand paths
     receptor_paths = (args.receptor_dir.joinpath(*pose[-2:]) for pose in ligand_poses)
     receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
-    traj_zip = zip(receptor_traj, ligand_traj)
-    # always do this receptor first!
-    complex_ag = receptor_ag + ligand_ag
-    complex_e = get_energy_from_coords(complex_sim, complex_ag, minimize=args.minimize)
-    receptor_e = get_energy_from_coords(receptor_sim, receptor_ag, minimize=args.minimize)
-    ligand_e = get_energy_from_coords(ligand_sim, ligand_ag, minimize=args.minimize)
+    traj_zip = zip(receptor_traj, ligand_traj, receptor_paths)
+    # Next will call next on the trajes within the zip object, which will update the atomic group coordinates.
+    scores = []
+    for _, _, receptor_path in traj_zip:
+        # always do this receptor first!
+        complex_ag = receptor_ag + ligand_ag
+        complex_e, complex_coords = get_energy_from_coords(complex_sim, complex_ag, minimize=args.minimize)
+        receptor_e, receptor_coords = get_energy_from_coords(receptor_sim, receptor_ag, minimize=args.minimize)
+        # get just the ligand coordinates out of the complex
+        ligand_ag.setCoords(complex_coords[-len(ligand_ag):])
+        ligand_e, ligand_coords = get_energy_from_coords(ligand_sim, ligand_ag, minimize=False)
+        interaction_e = complex_e - (receptor_e + ligand_e)
+        scores.append(interaction_e)
+        print(Path.joinpath(receptor_path.parts[-2:]),'complex', complex_e, 'ligand', ligand_e, 
+              'receptor', receptor_e, 'Interaction Energy:', interaction_e)
 
-    print('complex', complex_e, 'ligand', ligand_e, 'receptor', receptor_e)
-    print('Interaction Energy:', complex_e - (receptor_e + ligand_e))
 
-    if args.outconf_prefix:
-        save_conf_pdb(receptor_top, receptor_sim,
-                      args.outconf_prefix, '-receptor.pdb')
-        save_conf_pdb(ligand_top, ligand_sim,
-                      args.outconf_prefix, '-ligand.pdb')
-        save_conf_pdb(complex_top, complex_sim,
-                      args.outconf_prefix, '-complex.pdb')
+        if args.outconf_prefix:
+            save_conf_pdb(receptor_top, receptor_sim,
+                        args.outconf_prefix, '-receptor.pdb')
+            save_conf_pdb(ligand_top, ligand_sim,
+                        args.outconf_prefix, '-ligand.pdb')
+            save_conf_pdb(complex_top, complex_sim,
+                        args.outconf_prefix, '-complex.pdb')
+    score_array[i] = np.array(scores)
+
+# save the results
+ra.save(args.out, score_array)
