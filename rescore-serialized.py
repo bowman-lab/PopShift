@@ -47,29 +47,6 @@ def get_energy_from_coords(simulation: Simulation,
     state = simulation.context.getState(getEnergy=True)
     return state.getPotentialEnergy().value_in_unit(u.kilocalories_per_mole) * u.kilocalories_per_mole
 
-# sort order changed frim pick_align_frames.py
-
-
-def get_chosen_inds_filepaths(receptor_dir: Path):
-    # we sort this because we are assuming the bin dirs are numbered,
-    # and iterdir has no guaranteed order
-    bin_p_list = list(sorted(receptor_dir.iterdir(),
-                      key=lambda x: int(x.stem)))
-    # the 'stem' (file name no extension) should be a string following the pattern
-    # '{traj_index}-{frame_index}', so splitting on '-' and turning both of the substrings into ints
-    # gives us a list ordered by bin where each element in the list is a traj_index, frame_index tuple
-    # corresponding to a particular drawn frame.
-    chosen_inds = [
-        tuple(map(int, frame_p.stem.split('-'))) for bin_p in bin_p_list
-        for frame_p in bin_p.iterdir()
-    ]
-
-    full_inds = np.array([(bin_ix, trj_ix, fra_ix) for bin_ix, samples in enumerate(chosen_inds)
-                          for trj_ix, fra_ix in samples],
-                         dtype=[('bin', int), ('traj', int), ('frame', int)])
-    sorted_chosen = np.argsort(full_inds, order=['bin', 'traj', 'frame'])
-    return sorted_chosen
-
 
 def save_conf_pdb(omt: mm.app.Topology, simulation: Simulation, outpre: Path, suffix: str):
     # get positions out of postmin state, get convert from nanometers to angstroms.
@@ -117,29 +94,30 @@ ligand_ag = loos.createSystem(str(args.ligand_conf))
 with args.ligand_paths.open('rb') as f:
     ligand_paths = pickle.load(f)
 
-complex_simulation, complex_top = get_setup(args.serialized_params, 'complex')
-receptor_simulation, receptor_top = get_setup(
+complex_sim, complex_top = get_setup(args.serialized_params, 'complex')
+receptor_sim, receptor_top = get_setup(
     args.serialized_params, 'receptor')
-ligand_simulation, ligand_top = get_setup(args.serialized_params, 'ligand')
+ligand_sim, ligand_top = get_setup(args.serialized_params, 'ligand')
 print('Loaded OpenMM systems. Getting ready to do energy evaluations', flush=True)
-traj_z = zip(receptor_traj, ligand_traj)
-while next(traj_z, False):
+for ligand_poses in ligand_paths:
+    ligand_traj = vtraj_by_filename(ligand_poses, ligand_ag)
+    # change the paths to get receptor dir paths, from ligand paths
+    receptor_paths = (args.receptor_dir.joinpath(*pose[-2:]) for pose in ligand_poses)
+    receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
+    traj_zip = zip(receptor_traj, ligand_traj)
     # always do this receptor first!
     complex_ag = receptor_ag + ligand_ag
-    complex_e = get_energy_from_coords(
-        complex_simulation, complex_ag, minimize=args.minimize)
-    receptor_e = get_energy_from_coords(
-        receptor_simulation, receptor_ag, minimize=args.minimize)
-    ligand_e = get_energy_from_coords(
-        ligand_simulation, ligand_ag, minimize=args.minimize)
+    complex_e = get_energy_from_coords(complex_sim, complex_ag, minimize=args.minimize)
+    receptor_e = get_energy_from_coords(receptor_sim, receptor_ag, minimize=args.minimize)
+    ligand_e = get_energy_from_coords(ligand_sim, ligand_ag, minimize=args.minimize)
 
     print('complex', complex_e, 'ligand', ligand_e, 'receptor', receptor_e)
     print('Interaction Energy:', complex_e - (receptor_e + ligand_e))
 
     if args.outconf_prefix:
-        save_conf_pdb(receptor_top, receptor_simulation,
+        save_conf_pdb(receptor_top, receptor_sim,
                       args.outconf_prefix, '-receptor.pdb')
-        save_conf_pdb(ligand_top, ligand_simulation,
+        save_conf_pdb(ligand_top, ligand_sim,
                       args.outconf_prefix, '-ligand.pdb')
-        save_conf_pdb(complex_top, complex_simulation,
+        save_conf_pdb(complex_top, complex_sim,
                       args.outconf_prefix, '-complex.pdb')
