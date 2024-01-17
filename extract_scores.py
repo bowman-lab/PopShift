@@ -57,7 +57,7 @@ def rip_last_number(p: Path, numpattern=number_pattern):
 
 
 def rip_all_numbers(p: Path, numpattern=number_pattern):
-    return tuple(map(int, number_pattern.findall(p.stem)))
+    return tuple(map(int, numpattern.findall(p.stem)))
 
 
 # note, only finds first match, then uses last match of digit pattern.
