@@ -179,10 +179,8 @@ ligand_sim, ligand_top = get_setup(param_dir, 'ligand')
 
 print('Loaded OpenMM systems. Getting ready to do energy evaluations', flush=True)
 # initialize empty RA with correct shape
-lengths = [len(state_ps) for state_ps in ligand_paths]
-total = sum(lengths)
-score_array = ra.RaggedArray(np.zeros(total), lengths=lengths)
-for i, state_pose_ps in tqdm(enumerate(ligand_paths)):
+scores = []
+for i, state_pose_ps in enumerate(ligand_paths):
     ligand_traj = vtraj_by_filename(state_pose_ps, ligand_ag)
     # change the paths to get receptor dir paths, from ligand paths
     receptor_paths = list(args.receptor_dir.joinpath(
@@ -190,7 +188,6 @@ for i, state_pose_ps in tqdm(enumerate(ligand_paths)):
     receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
     traj_zip = zip(receptor_traj, ligand_traj, receptor_paths)
     # Next will call next on the trajes within the zip object, which will update the atomic group coordinates.
-    scores = []
     for _, _, receptor_path in traj_zip:
         # always do this receptor first!
         complex_ag = receptor_ag + ligand_ag
@@ -246,7 +243,7 @@ for i, state_pose_ps in tqdm(enumerate(ligand_paths)):
         ligand_e = get_energy_from_coords(ligand_sim, ligand_ag)
         interaction_e = complex_e - (receptor_e + ligand_e)
         # Save and report the scores.
-        scores.append(interaction_e)
+        scores.append(interaction_e.value_in_unit(u.kilocalories_per_mole))
         print(Path().joinpath(*receptor_path.parts[-2:]), 'complex', complex_e, 'ligand', ligand_e,
               'receptor', receptor_e, 'Interaction Energy:', interaction_e)
 
@@ -257,7 +254,7 @@ for i, state_pose_ps in tqdm(enumerate(ligand_paths)):
                           args.outconf_prefix, '-ligand.pdb')
             save_conf_pdb(complex_top, complex_sim,
                           args.outconf_prefix, '-complex.pdb')
-    score_array[i] = np.array(scores)
-
+lengths = [len(state_ps) for state_ps in ligand_paths]
+score_array = ra.RaggedArray(scores, lengths=lengths)
 # save the results
-ra.save(args.out_scores, score_array)
+ra.save(str(args.out_scores), score_array)
