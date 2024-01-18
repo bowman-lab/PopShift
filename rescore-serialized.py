@@ -95,7 +95,7 @@ args = p.parse_args()
 
 receptor_ag = loos.createSystem(str(args.receptor_conf))
 ligand_ag = loos.createSystem(str(args.ligand_conf))
-with args.ligand_paths.open('rb') as f:
+with args.pose_paths.open('rb') as f:
     ligand_paths = pickle.load(f)
 
 lengths = [len(state_ps) for state_ps in ligand_paths]
