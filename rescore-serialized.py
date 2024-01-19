@@ -93,7 +93,8 @@ def get_restrained_energy_from_coords(simulation: Simulation,
     state = simulation.context.getState(getEnergy=True, getPositions=True)
     full_e = state.getPotentialEnergy().value_in_unit(
         u.kilocalories_per_mole) * u.kilocalories_per_mole
-    postmin_positions = state.getPositions(asNumpy=True).value_in_unit(u.angstroms)
+    postmin_positions = state.getPositions(
+        asNumpy=True).value_in_unit(u.angstroms)
     restraint_state = simulation.context.getState(
         getEnergy=True, groups=restraint_group)
     restraint_e = restraint_state.getPotentialEnergy().value_in_unit(
@@ -169,7 +170,7 @@ if args.restrain:
         param_dir, 'receptor', restraint_inds=rec_rest_inds, restraint_constant=args.restraint_k)
     # Because ligand bond/angle geometry will be off, the restraint needs to be much lighter to relax pose.
     # ligand_sim, ligand_top, lig_res, lig_part_term_inds, lig_res_fg = get_setup_restraints(
-    #     param_dir, 'ligand' , restraint_inds=lig_rest_inds, 
+    #     param_dir, 'ligand' , restraint_inds=lig_rest_inds,
     #     restraint_constant=10*u.kilocalorie_per_mole/u.angstrom)
     # ligand_sim, ligand_top = get_setup(param_dir, 'ligand')
 else:
@@ -202,37 +203,21 @@ for i, state_pose_ps in enumerate(ligand_paths):
                     cplx_part_term_inds
                 )
                 receptor_e, receptor_crds = get_restrained_energy_from_coords(
-                    receptor_sim, 
-                    receptor_ag, 
-                    rec_rest_inds, 
-                    rec_res, 
-                    rec_res_fg, 
+                    receptor_sim,
+                    receptor_ag,
+                    rec_rest_inds,
+                    rec_res,
+                    rec_res_fg,
                     rec_part_term_inds
                 )
                 # get just the ligand coordinates out of the complex
                 ligand_ag.setCoords(complex_crds[-len(ligand_ag):])
-                # use the minimized coords to estimate the ligand alone energy
-                # ligand_e, ligand_crds = get_restrained_energy_from_coords(
-                #     ligand_sim, 
-                #     ligand_ag,
-                #     lig_rest_inds,
-                #     lig_res,
-                #     lig_res_fg,
-                #     lig_part_term_inds
-                # )
-                # # ligand_e = 201 * u.kilocalorie_per_mole
-                # # if ligand_e > 200 * u.kilocalorie_per_mole:
-                # #     ligand_e, ligand_crds = get_minimized_energy(ligand_sim, ligand_ag)
-                # #     tp = Path().joinpath(*receptor_path.parts[-2:])
-                # #     if not tp.parent.is_dir():
-                # #         tp.parent.mkdir()
-                # #     ligand_ag.setCoords(ligand_crds)
-                # #     np 
-                # #     print(tp, 'ligand_e:', ligand_e)
 
             else:
-                complex_e, complex_crds = get_minimized_energy(complex_sim, complex_ag)
-                receptor_e, receptor_crds = get_minimized_energy(receptor_sim, receptor_ag)
+                complex_e, complex_crds = get_minimized_energy(
+                    complex_sim, complex_ag)
+                receptor_e, receptor_crds = get_minimized_energy(
+                    receptor_sim, receptor_ag)
                 # get just the ligand coordinates out of the complex
                 ligand_ag.setCoords(complex_crds[-len(ligand_ag):])
                 # use the minimized coords to estimate the ligand alone energy
@@ -244,16 +229,16 @@ for i, state_pose_ps in enumerate(ligand_paths):
         interaction_e = complex_e - (receptor_e + ligand_e)
         # Save and report the scores.
         scores.append(interaction_e.value_in_unit(u.kilocalories_per_mole))
-        print(Path().joinpath(*receptor_path.parts[-2:]), 'complex', complex_e, 'ligand', ligand_e,
+        rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
+        print(rec_rel_path, 'complex', complex_e, 'ligand', ligand_e,
               'receptor', receptor_e, 'Interaction Energy:', interaction_e)
 
         if args.outconf_prefix:
-            save_conf_pdb(receptor_top, receptor_sim,
-                          args.outconf_prefix, '-receptor.pdb')
-            save_conf_pdb(ligand_top, ligand_sim,
-                          args.outconf_prefix, '-ligand.pdb')
-            save_conf_pdb(complex_top, complex_sim,
-                          args.outconf_prefix, '-complex.pdb')
+            outdir = args.outconf_prefix/rec_rel_path.with_suffix('')
+            outdir.parent.mkdir(parents=True, exist_ok=True)
+            save_conf_pdb(receptor_top, receptor_sim, outdir/'receptor.pdb')
+            save_conf_pdb(ligand_top, ligand_sim, outdir/'ligand.pdb')
+            save_conf_pdb(complex_top, complex_sim, outdir/'complex.pdb')
 lengths = [len(state_ps) for state_ps in ligand_paths]
 score_array = ra.RaggedArray(scores, lengths=lengths)
 # save the results
