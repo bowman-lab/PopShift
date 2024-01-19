@@ -82,7 +82,7 @@ def get_restrained_energy_from_coords(simulation: Simulation,
                                       traj_ag: loos.AtomicGroup,
                                       restraint_range, restraint_obj,
                                       restraint_group, particle_term_inds,
-                                      tolerance=0.001 * u.kilocalories_per_mole):
+                                      tolerance=0.001 * u.kilocalorie/(u.mole * u.angstrom)):
     positions_angstroms = traj_ag.getCoords()*u.angstroms
     simulation.context.setPositions(positions_angstroms)
     for atom_ix, particle_term_ix in zip(restraint_range, particle_term_inds):
