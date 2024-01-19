@@ -1,8 +1,8 @@
 import argparse as ap
 from openff.toolkit import Molecule, Topology
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
-from openmm.app import ForceField, CustomExternalForce
-from openmm import XmlSerializer
+from openmm.app import ForceField
+from openmm import XmlSerializer, CustomExternalForce
 from openmm import unit as u
 from pathlib import Path
 from math import sqrt
