@@ -1,4 +1,5 @@
 from openmm.app import Simulation, PDBFile
+from openmm import Platform
 from openff.toolkit import Topology
 from openmm import unit as u
 import openmm as mm
@@ -19,18 +20,20 @@ def float_to_kcal_mol_angstrom(number):
 def get_setup(serialize_dir: Path, fn: str,
               restraint_range=None,
               restraint_constant=1000*u.kilocalorie_per_mole/u.angstrom):
+    platform = Platform.getPlatformByName('CPU')
     system_xml_p = (serialize_dir/(fn+'-sys')).with_suffix('.xml')
     system = mm.XmlSerializer.deserialize(system_xml_p.read_text())
     top_json_p = (serialize_dir/(fn+'-top')).with_suffix('.json')
     top = Topology.from_json(top_json_p.read_text()).to_openmm()
     integrator = mm.VerletIntegrator(0.001*mm.unit.picosecond)
-    simulation = Simulation(top, system, integrator)
+    simulation = Simulation(top, system, integrator, platform=platform)
     return simulation, top
 
 
 # Need different inputs if we are prepping restraints.
 def get_setup_restraints(serialize_dir: Path, fn: str, restraint_inds: list[int],
                          restraint_constant=100*u.kilocalorie_per_mole/u.angstrom):
+    platform = Platform.getPlatformByName('CPU')
     system_xml_p = (serialize_dir/(fn+'-sys')).with_suffix('.xml')
     system = mm.XmlSerializer.deserialize(system_xml_p.read_text())
     top_json_p = (serialize_dir/(fn+'-top')).with_suffix('.json')
@@ -50,7 +53,7 @@ def get_setup_restraints(serialize_dir: Path, fn: str, restraint_inds: list[int]
             # put in placeholder coords since we'll have to overwrite repeadedly later.
             particle_term_inds.append(
                 restraint.addParticle(atom_ix, [0.0, 0.0, 0.0]))
-    simulation = Simulation(top, system, integrator)
+    simulation = Simulation(top, system, integrator, platform=platform)
     return simulation, top, restraint, particle_term_inds, restraint_forcegroup
 
 
