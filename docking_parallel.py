@@ -121,6 +121,7 @@ class plants_docker:
                                                   receptor=receptor_path.resolve(), 
                                                   ligand=ligand_path.resolve(), 
                                                   output_dir=plants_out.name, **kwargs)
+        print(plants_conf, flush=True)
         plants_conf_p.write_text(plants_conf)
         plants_exit = sp.run(f"{self.plants_exe_path} --mode screen {plants_conf_p.name}".split(), cwd=plants_conf_p.parent)
         # This gets the highest ranking pose, of 10
