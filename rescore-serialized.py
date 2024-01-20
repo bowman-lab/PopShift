@@ -128,12 +128,12 @@ p = ap.ArgumentParser(formatter_class=ap.ArgumentDefaultsHelpFormatter)
 p.add_argument('param_dir', type=Path,
                help='Path to directory holding parameterized topology and systems. '
                'Expects dir to contain six files with names: {complex,receptor,ligand}-{sys.xml,top.json}.')
-p.add_argument('receptor_conf', type=Path,
-               help='Path to coordinates of receptor. Ordering of atoms must match tops and systems.')
+# p.add_argument('receptor_conf', type=Path,
+            #    help='Path to coordinates of receptor. Ordering of atoms must match tops and systems.')
 p.add_argument('receptor_dir', type=Path,
                help='Path to directory containing the conformations to use as receptor conformations (expected to be PDBs).')
-p.add_argument('ligand_conf', type=Path,
-               help='Path to coordinates of ligand. Order of atoms must match top and sys files.')
+# p.add_argument('ligand_conf', type=Path,
+            #    help='Path to coordinates of ligand. Order of atoms must match top and sys files.')
 p.add_argument('pose_paths', type=Path,
                help='Pickle file containing coordinates of ligand poses (from extract_scores.py).')
 p.add_argument('out_scores', type=Path,
@@ -149,14 +149,14 @@ p.add_argument('--restraint-k', type=float_to_kcal_mol_angstrom, default=100 * u
 
 args = p.parse_args()
 
-receptor_ag = loos.createSystem(str(args.receptor_conf))
-ligand_ag = loos.createSystem(str(args.ligand_conf))
+param_dir = args.param_dir
+receptor_ag = loos.createSystem(str(param_dir/'receptor-top.pdb'))
+ligand_ag = loos.createSystem(str(param_dir/'ligand-top.pdb'))
 with args.pose_paths.open('rb') as f:
     ligand_paths = pickle.load(f)
 
 ligand_paths = [[pose.with_suffix('.pdb') for pose in state_poses]
                 for state_poses in ligand_paths]
-param_dir = args.param_dir
 # Set up simulations, potentially with restraints.
 if args.restrain:
     # get restraind indices for ligand heavies.
