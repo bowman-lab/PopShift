@@ -1,8 +1,8 @@
 import argparse as ap
 from openff.toolkit import Molecule, Topology
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
-from openmm.app import ForceField, CustomExternalForce
-from openmm import XmlSerializer
+from openmm.app import ForceField
+from openmm import XmlSerializer, CustomExternalForce
 from openmm import unit as u
 from pathlib import Path
 from math import sqrt
@@ -57,7 +57,7 @@ ligand.generate_conformers(n_conformers=10)
 ligand.assign_partial_charges(partial_charge_method='am1bcc', 
                               use_conformers=ligand.conformers)
 receptor = Topology.from_pdb(args.receptor_pdb)
-receptor_count = len(receptor.atoms())
+receptor_count = len(list(receptor.atoms()))
 # make topologies, and serialize them
 lig_top = ligand.to_topology()
 # always do this receptor first!
