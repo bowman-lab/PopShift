@@ -234,7 +234,7 @@ for i, state_pose_ps in enumerate(ligand_paths):
         scores.append(interaction_e.value_in_unit(u.kilocalories_per_mole))
         rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
         print(rec_rel_path, 'complex', complex_e, 'ligand', ligand_e,
-              'receptor', receptor_e, 'Interaction Energy:', interaction_e)
+              'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
 
         if args.outconf_prefix:
             outdir = args.outconf_prefix/rec_rel_path.with_suffix('')
