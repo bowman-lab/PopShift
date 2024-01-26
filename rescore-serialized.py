@@ -1,5 +1,4 @@
 from openmm.app import Simulation, PDBFile
-from openmm import Platform
 from openff.toolkit import Topology
 from openmm import unit as u
 import openmm as mm
@@ -17,21 +16,29 @@ def float_to_kcal_mol_angstrom(number):
     return float(number) * u.kilocalorie_per_mole/u.angstrom
 
 
-def get_setup(serialize_dir: Path, fn: str, platform_name='CPU'):
-    platform = Platform.getPlatformByName(platform_name)
+def print_platform_stuff(sim: Simulation):
+    platform = sim.context.getPlatform()
+    print('OpenMM Platform:', platform.getName(), 
+          *(f'{name}: {platform.getPropertyValue(name)}' 
+            for name in platform.getPropertyNames()),
+            flush=True
+    )
+
+
+def get_setup(serialize_dir: Path, fn: str):
     system_xml_p = (serialize_dir/(fn+'-sys')).with_suffix('.xml')
     system = mm.XmlSerializer.deserialize(system_xml_p.read_text())
     top_json_p = (serialize_dir/(fn+'-top')).with_suffix('.json')
     top = Topology.from_json(top_json_p.read_text()).to_openmm()
     integrator = mm.VerletIntegrator(0.001*mm.unit.picosecond)
-    simulation = Simulation(top, system, integrator, platform=platform)
+    simulation = Simulation(top, system, integrator)
+    print_platform_stuff(simulation)
     return simulation, top
 
 
 # Need different inputs if we are prepping restraints.
 def get_setup_restraints(serialize_dir: Path, fn: str, restraint_inds: list[int],
-                         restraint_constant=100*u.kilocalorie_per_mole/u.angstrom, platform_name='CPU'):
-    platform = Platform.getPlatformByName(platform_name)
+                         restraint_constant=100*u.kilocalorie_per_mole/u.angstrom):
     system_xml_p = (serialize_dir/(fn+'-sys')).with_suffix('.xml')
     system = mm.XmlSerializer.deserialize(system_xml_p.read_text())
     top_json_p = (serialize_dir/(fn+'-top')).with_suffix('.json')
@@ -51,7 +58,8 @@ def get_setup_restraints(serialize_dir: Path, fn: str, restraint_inds: list[int]
             # put in placeholder coords since we'll have to overwrite repeadedly later.
             particle_term_inds.append(
                 restraint.addParticle(atom_ix, [0.0, 0.0, 0.0]))
-    simulation = Simulation(top, system, integrator, platform=platform)
+    simulation = Simulation(top, system, integrator)
+    print_platform_stuff(simulation)
     return simulation, top, restraint, particle_term_inds, restraint_forcegroup
 
 
@@ -125,12 +133,8 @@ p = ap.ArgumentParser(formatter_class=ap.ArgumentDefaultsHelpFormatter)
 p.add_argument('param_dir', type=Path,
                help='Path to directory holding parameterized topology and systems. '
                'Expects dir to contain six files with names: {complex,receptor,ligand}-{sys.xml,top.json}.')
-# p.add_argument('receptor_conf', type=Path,
-            #    help='Path to coordinates of receptor. Ordering of atoms must match tops and systems.')
 p.add_argument('receptor_dir', type=Path,
                help='Path to directory containing the conformations to use as receptor conformations (expected to be PDBs).')
-# p.add_argument('ligand_conf', type=Path,
-            #    help='Path to coordinates of ligand. Order of atoms must match top and sys files.')
 p.add_argument('pose_paths', type=Path,
                help='Pickle file containing coordinates of ligand poses (from extract_scores.py).')
 p.add_argument('out_scores', type=Path,
@@ -141,8 +145,6 @@ p.add_argument('--restrain', action=ap.BooleanOptionalAction, default=True,
                help='Restrain receptor heavy atoms during minimization. Ignored if "--no-minimize" is thrown.')
 p.add_argument('--outconf-prefix', type=Path, default=None,
                help='If provided, write pdb of each finished structure with this prefix.')
-p.add_argument('--openmm-platform', '-p', type=str, default='CPU', 
-               help='Name of openMM platform to use.')
 p.add_argument('--restraint-k', type=float_to_kcal_mol_angstrom, default=100 * u.kilocalorie_per_mole/u.angstrom,
                help='If provided, use restraint constant in place of default for positional restraints.')
 
@@ -167,20 +169,15 @@ if args.restrain:
     rec_rest_inds = [at.index() for at in receptor_heavies]
 
     complex_sim, complex_top, cplx_res, cplx_part_term_inds, cplx_res_fg = get_setup_restraints(
-        param_dir, 'complex', restraint_inds=rec_rest_inds, restraint_constant=args.restraint_k, platform_name=args.openmm_platform)
+        param_dir, 'complex', restraint_inds=rec_rest_inds, restraint_constant=args.restraint_k)
     receptor_sim, receptor_top, rec_res, rec_part_term_inds, rec_res_fg = get_setup_restraints(
-        param_dir, 'receptor', restraint_inds=rec_rest_inds, restraint_constant=args.restraint_k, platform_name=args.openmm_platform)
-    # Because ligand bond/angle geometry will be off, the restraint needs to be much lighter to relax pose.
-    # ligand_sim, ligand_top, lig_res, lig_part_term_inds, lig_res_fg = get_setup_restraints(
-    #     param_dir, 'ligand' , restraint_inds=lig_rest_inds,
-    #     restraint_constant=10*u.kilocalorie_per_mole/u.angstrom)
-    # ligand_sim, ligand_top = get_setup(param_dir, 'ligand')
+        param_dir, 'receptor', restraint_inds=rec_rest_inds, restraint_constant=args.restraint_k)
 else:
     complex_sim, complex_top = get_setup(param_dir, 'complex')
     receptor_sim, receptor_top = get_setup(param_dir, 'receptor')
-ligand_sim, ligand_top = get_setup(param_dir, 'ligand', platform_name=args.openmm_platform)
+ligand_sim, ligand_top = get_setup(param_dir, 'ligand')
 
-print(f'Loaded OpenMM systems. Set up simulations with {args.openmm_platform} platform. Getting ready to do energy evaluations', flush=True)
+print(f'Loaded OpenMM systems. Getting ready to do energy evaluations', flush=True)
 # initialize empty RA with correct shape
 scores = []
 for i, state_pose_ps in enumerate(ligand_paths):
