@@ -90,15 +90,15 @@ off_serialize(args.out_dir, 'complex-top', rl_complex)
 # Create the SMIRNOFF template generator with the default installed force field
 smirnoff = SMIRNOFFTemplateGenerator(molecules=ligand, forcefield=args.ligand_ff)
 # Create an OpenMM ForceField object with AMBER ff14SB and TIP3P with compatible ions
-forcefield = ForceField(args.receptor_ff)
+forcefield = ForceField(args.receptor_ff, args.implicit)
 # Register the SMIRNOFF template generator
 forcefield.registerTemplateGenerator(smirnoff.generator)
 
 # make systems from each of the topologies above
-receptor_sys = forcefield.createSystem(receptor.to_openmm())
-ligand_sys = forcefield.createSystem(lig_top.to_openmm())
+receptor_sys = forcefield.createSystem(receptor.to_openmm(), ImplicitSolventKappa=kappa)
+ligand_sys = forcefield.createSystem(lig_top.to_openmm(), ImplicitSolventKappa=kappa)
 rl_complex_ommt = rl_complex.to_openmm()
-complex_sys = forcefield.createSystem(rl_complex_ommt)
+complex_sys = forcefield.createSystem(rl_complex_ommt, ImplicitSolventKappa=kappa)
 # optionally add receptor restraints
 if args.restraint_k:
     restraint = CustomExternalForce('k*((x-x0)^2 + (y-y0)^2 + (z-z0)^2)')
