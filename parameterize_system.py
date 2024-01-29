@@ -1,6 +1,5 @@
 import argparse as ap
 from openff.toolkit import Molecule, Topology
-from openff.toolkit import ForceField as off_ForceField
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
 from openmm.app import ForceField
 from openmm import XmlSerializer, CustomExternalForce
@@ -55,7 +54,7 @@ p.add_argument('out_dir', type=Path,
                help='Name of directory to write parameterized jsons and systems to.')
 p.add_argument('--receptor-ff', type=str, default='amber/protein.ff14SB.xml',
                help='Name of force field xml to use as argument to openmm.ForceField.')
-p.add_argument('--implicit', type=str, default='implicit/obc2.xml', 
+p.add_argument('--implicit', type=str, default='implicit/obc2.xml',
                help='Name of implicit solvent model to use as argument to openmm ForceField.')
 p.add_argument('--restraint-k', type=float, default=None,
                help='Restrain receptor to the starting conformation with the provided force constant;'
@@ -95,10 +94,10 @@ forcefield = ForceField(args.receptor_ff, args.implicit)
 forcefield.registerTemplateGenerator(smirnoff.generator)
 
 # make systems from each of the topologies above
-receptor_sys = forcefield.createSystem(receptor.to_openmm(), ImplicitSolventKappa=kappa)
-ligand_sys = forcefield.createSystem(lig_top.to_openmm(), ImplicitSolventKappa=kappa)
+receptor_sys = forcefield.createSystem(receptor.to_openmm(), implicitSolventKappa=kappa)
+ligand_sys = forcefield.createSystem(lig_top.to_openmm(), implicitSolventKappa=kappa)
 rl_complex_ommt = rl_complex.to_openmm()
-complex_sys = forcefield.createSystem(rl_complex_ommt, ImplicitSolventKappa=kappa)
+complex_sys = forcefield.createSystem(rl_complex_ommt, implicitSolventKappa=kappa)
 # optionally add receptor restraints
 if args.restraint_k:
     restraint = CustomExternalForce('k*((x-x0)^2 + (y-y0)^2 + (z-z0)^2)')
