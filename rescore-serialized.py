@@ -8,9 +8,24 @@ import loos
 from loos import pyloos
 import pickle
 from enspara import ra
-import numpy as np
 import argparse as ap
-from tqdm import tqdm
+
+import spyrmsd as sp
+
+
+
+def map_via_graph(ap: Path, bp: Path):
+    a_obmol = sp.io.load(str(ap))
+    a_spymol = sp.io.to_molecule(a_obmol, adjacency=True)
+    b_obmol = sp.io.load(str(bp))
+    b_spymol = sp.io.to_molecule(b_obmol, adjacency=True)
+    
+    # Convert molecules to graphs
+    G1 = sp.graph.graph_from_adjacency_matrix(am_a, a_props)
+    G2 = sp.graph.graph_from_adjacency_matrix(am_b, b_props)
+
+    # Get all the possible graph isomorphisms
+    isomorphisms = sp.graph.match_graphs(G1, G2)
 
 
 def float_to_kcal_mol_angstrom(number):
@@ -128,12 +143,8 @@ p = ap.ArgumentParser(formatter_class=ap.ArgumentDefaultsHelpFormatter)
 p.add_argument('param_dir', type=Path,
                help='Path to directory holding parameterized topology and systems. '
                'Expects dir to contain six files with names: {complex,receptor,ligand}-{sys.xml,top.json}.')
-# p.add_argument('receptor_conf', type=Path,
-            #    help='Path to coordinates of receptor. Ordering of atoms must match tops and systems.')
 p.add_argument('receptor_dir', type=Path,
                help='Path to directory containing the conformations to use as receptor conformations (expected to be PDBs).')
-# p.add_argument('ligand_conf', type=Path,
-            #    help='Path to coordinates of ligand. Order of atoms must match top and sys files.')
 p.add_argument('pose_paths', type=Path,
                help='Pickle file containing coordinates of ligand poses (from extract_scores.py).')
 p.add_argument('out_scores', type=Path,

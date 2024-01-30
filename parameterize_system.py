@@ -54,9 +54,12 @@ if not args.out_dir.is_dir():
 
 ligand = Molecule.from_smiles(args.ligand_smiles)
 ligand.generate_conformers(n_conformers=10)
+print('Generated ligand conformers from SMILES. Prepping charges.', flush=True)
 ligand.assign_partial_charges(partial_charge_method='am1bcc', 
                               use_conformers=ligand.conformers)
+print('Finished getting ligand charges.', flush=True)
 receptor = Topology.from_pdb(args.receptor_pdb)
+print('Got receptor topology.')
 receptor_count = len(list(receptor.atoms))
 # make topologies, and serialize them
 lig_top = ligand.to_topology()
@@ -73,7 +76,7 @@ smirnoff = SMIRNOFFTemplateGenerator(molecules=ligand)
 forcefield = ForceField(args.receptor_ff, 'implicit/' + args.implicit)
 # Register the SMIRNOFF template generator
 forcefield.registerTemplateGenerator(smirnoff.generator)
-
+print('Getting ready to make force fields.')
 # make systems from each of the topologies above
 receptor_sys = forcefield.createSystem(receptor.to_openmm(), implicitSolventKappa=kappa)
 ligand_sys = forcefield.createSystem(lig_top.to_openmm(), implicitSolventKappa=kappa)
@@ -81,7 +84,7 @@ rl_complex_ommt = rl_complex.to_openmm()
 complex_sys = forcefield.createSystem(rl_complex_ommt, implicitSolventKappa=kappa)
 # optionally ad receptor restraints
 if args.restraint_k:
-    restraint = CustomExternalForce('k*periodicdistance(x, y, z, x0, y0, z0)^2')
+    restraint = CustomExternalForce('k*((x-x0)^2 + (y-y0)^2 + (z-z0)^2)')
     restraint_ix = complex_sys.addForce(restraint)
     restraint.addGlobalParameter('k', args.restraint_k * u.kilocalories_per_mole / u.angstrom)
     restraint.addPerParticleParameter('x0')
