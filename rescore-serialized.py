@@ -19,13 +19,16 @@ def map_via_graph(ap: Path, bp: Path):
     a_spymol = sp.io.to_molecule(a_obmol, adjacency=True)
     b_obmol = sp.io.load(str(bp))
     b_spymol = sp.io.to_molecule(b_obmol, adjacency=True)
-    
+    a_noh = a_spymol.strip()
+    b_noh = b_spymol.strip()
+
     # Convert molecules to graphs
-    G1 = sp.graph.graph_from_adjacency_matrix(am_a, a_props)
-    G2 = sp.graph.graph_from_adjacency_matrix(am_b, b_props)
+    G1 = a_noh.to_graph()
+    G2 = b_noh.to_graph()
 
     # Get all the possible graph isomorphisms
     isomorphisms = sp.graph.match_graphs(G1, G2)
+    return isomorphisms
 
 
 def float_to_kcal_mol_angstrom(number):
