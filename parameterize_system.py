@@ -53,15 +53,27 @@ p.add_argument('--restraint-k', type=float, default=None,
                help='Restrain receptor to the starting conformation with the provided force constant;'
                 ' for minimized energy evaluations. Assumes k is in  kcal/(mol * Angstrom).')
 p.add_argument('--write-sdf', action=ap.BooleanOptionalAction, default=True,
-               help='If cancelled don')
+               help='If cancelled, do not write ligand SDF.')
+p.add_argument('--temperature', type=float, default=300,
+               help='Temperature for GB parameters, in Kelvin.')
+p.add_argument('--solvent-dielectric', type=float, default=78.5,
+               help='Dielectric to use for GB parameters.')
+p.add_argument('--salt-conc', type=float, default=0.150,
+               help='Monovalent salt concentration for ionic strength of GB parameters, in Molar.')
+p.add_argument('--kappa', type=float, default=None,
+               help='Add screening parameters in as kappa directly, '
+               'as opposed to using solvent condition inputs to calculate it.')
 
 args = p.parse_args()
 
-# Compute Kappa for  implicit solvent Ionic Strength
-temperature = 300
-solv_dielectric = 78.5
-conc = 0.150
-kappa = 367.434915*sqrt(conc/(solv_dielectric*temperature))
+# Compute Kappa for implicit solvent Ionic Strength
+temperature = args.temperature
+solv_dielectric = args.solvent_dielectric
+conc = args.salt_conc
+if args.kappa:
+    kappa = args.kappa
+else:
+    kappa = 367.434915*sqrt(conc/(solv_dielectric*temperature))
 
 if not args.out_dir.is_dir():
     args.out_dir.mkdir(parents=True)
