@@ -221,8 +221,6 @@ if __name__ == '__main__' or jug.is_jug_running():
                         help='Number of binding modes to ask for.')
     parser.add_argument('--cnn-scoring', type=str, default='rescore',
                         help='If using GNINA for docking, pass this argument through to call to gnina.')
-    parser.add_argument('--pose-sort-order', type=str, default='CNNaffinity',
-                        help='If GNINA docking, pass this to sort docking results. Other opts: CNNscore, Energy.')      
     parser.add_argument('--cnn-freeze-receptor', default=True, action=ap.BooleanOptionalAction,
                         help='If using GNINA, pass this onto the call.')
     parser.add_argument('--plants-path', default=None, type=Path,
@@ -277,11 +275,9 @@ if __name__ == '__main__' or jug.is_jug_running():
         frame_paths = sorted(map(lambda x: x.with_suffix('.pdb'), path_receptor.rglob('*.pdb')))
         if args.cnn_freeze_receptor:
             dock_algo = partial(dock_algo, num_modes=args.num_modes, cnn_scoring=args.cnn_scoring, 
-                                pose_sort_order=args.pose_sort_order,
                                 cnn_freeze_receptor='--cnn_freeze_receptor', cpu=args.cpu, exhaustiveness=args.exhaustiveness)
         else:
             dock_algo = partial(dock_algo, num_modes=args.num_modes, cnn_scoring=args.cnn_scoring, 
-                                pose_sort_order=args.pose_sort_order,
                                 cpu=args.cpu, exhaustiveness=args.exhaustiveness)
     else: 
         frame_paths = sorted(path_receptor.rglob('*.pdbqt'))
