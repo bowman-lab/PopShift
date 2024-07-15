@@ -155,6 +155,8 @@ p.add_argument('out_scores', type=Path,
                help="h5 file with enspara RA containing scores in the same order as the docking scores extracted with popshift.")
 p.add_argument('--minimize', action=ap.BooleanOptionalAction, default=True,
                help='Minimize before calculating GB energy.')
+p.add_argument('--rel-to', '-d', type=Path, default=None,
+               help='Directory to look within for ligand pose paths. If none, then will look at parent of receptor dir.')
 p.add_argument('--restrain', action=ap.BooleanOptionalAction, default=True,
                help='Restrain receptor heavy atoms during minimization. Ignored if "--no-minimize" is thrown.')
 p.add_argument('--outconf-prefix', type=Path, default=None,
@@ -167,13 +169,17 @@ args = p.parse_args()
 param_dir = args.param_dir
 receptor_ag = loos.createSystem(str(param_dir/'receptor-top.pdb'))
 ligand_ag = loos.createSystem(str(param_dir/'ligand-top.pdb'))
+if args.rel_to:
+    top_dir = args.rel_to
+else:
+    top_dir = args.receptor_dir.parent
 if args.pose_paths.suffix == '.txt':
-    ligand_paths = [[Path(line)] for line in args.pose_paths.read_text().strip().split()]
+    ligand_paths = [[top_dir / line] for line in args.pose_paths.read_text().strip().split()]
 else:
     with args.pose_paths.open('rb') as f:
         ligand_paths = pickle.load(f)
 
-ligand_paths = [[pose.with_suffix('.pdb') for pose in state_poses]
+ligand_paths = [[top_dir / pose.with_suffix('.pdb') for pose in state_poses]
                 for state_poses in ligand_paths]
 # Set up simulations, potentially with restraints.
 if args.restrain:
