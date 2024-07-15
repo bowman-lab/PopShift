@@ -149,7 +149,8 @@ p.add_argument('param_dir', type=Path,
 p.add_argument('receptor_dir', type=Path,
                help='Path to directory containing the conformations to use as receptor conformations (expected to be PDBs).')
 p.add_argument('pose_paths', type=Path,
-               help='Pickle file containing coordinates of ligand poses (from extract_scores.py).')
+               help='File containing coordinates of ligand poses (from extract_scores.py). '
+               'Assumes file is a pickle unless extension is .txt, in which case it assumes text.')
 p.add_argument('out_scores', type=Path,
                help="h5 file with enspara RA containing scores in the same order as the docking scores extracted with popshift.")
 p.add_argument('--minimize', action=ap.BooleanOptionalAction, default=True,
@@ -166,8 +167,11 @@ args = p.parse_args()
 param_dir = args.param_dir
 receptor_ag = loos.createSystem(str(param_dir/'receptor-top.pdb'))
 ligand_ag = loos.createSystem(str(param_dir/'ligand-top.pdb'))
-with args.pose_paths.open('rb') as f:
-    ligand_paths = pickle.load(f)
+if args.pose_paths.suffix == '.txt':
+    ligand_paths = list(map(Path, (line for line in pose_paths.read_text().strip().split())))
+else:
+    with args.pose_paths.open('rb') as f:
+        ligand_paths = pickle.load(f)
 
 ligand_paths = [[pose.with_suffix('.pdb') for pose in state_poses]
                 for state_poses in ligand_paths]
