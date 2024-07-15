@@ -168,7 +168,7 @@ param_dir = args.param_dir
 receptor_ag = loos.createSystem(str(param_dir/'receptor-top.pdb'))
 ligand_ag = loos.createSystem(str(param_dir/'ligand-top.pdb'))
 if args.pose_paths.suffix == '.txt':
-    ligand_paths = list(map(Path, (line for line in args.pose_paths.read_text().strip().split())))
+    ligand_paths = [[Path(line)] for line in args.pose_paths.read_text().strip().split()]
 else:
     with args.pose_paths.open('rb') as f:
         ligand_paths = pickle.load(f)
