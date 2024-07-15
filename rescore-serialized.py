@@ -174,13 +174,13 @@ if args.rel_to:
 else:
     top_dir = args.receptor_dir.parent
 if args.pose_paths.suffix == '.txt':
-    ligand_paths = [[top_dir / line] for line in args.pose_paths.read_text().strip().split()]
+    ligand_paths = [[(top_dir / line).with_suffix('.pdb')] 
+                    for line in args.pose_paths.read_text().strip().split()]
 else:
     with args.pose_paths.open('rb') as f:
         ligand_paths = pickle.load(f)
-
-ligand_paths = [[top_dir / pose.with_suffix('.pdb') for pose in state_poses]
-                for state_poses in ligand_paths]
+    ligand_paths = [[top_dir / pose.with_suffix('.pdb') for pose in state_poses]
+                    for state_poses in ligand_paths]
 # Set up simulations, potentially with restraints.
 if args.restrain:
     # get restraind indices for ligand heavies.
