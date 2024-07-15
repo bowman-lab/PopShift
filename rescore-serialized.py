@@ -210,9 +210,11 @@ print('Loaded OpenMM systems. Getting ready to do energy evaluations', flush=Tru
 scores = []
 for i, state_pose_ps in enumerate(ligand_paths):
     ligand_traj = vtraj_by_filename(state_pose_ps, ligand_ag)
+    print('Loaded ligand paths for state', i, flush=True)
     # change the paths to get receptor dir paths, from ligand paths
     receptor_paths = list(args.receptor_dir.joinpath(
         *pose_p.parts[-2:]) for pose_p in state_pose_ps)
+    print('Loaded receptor paths for state', i, flush=True)
     receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
     traj_zip = zip(receptor_traj, ligand_traj, receptor_paths)
     # Next will call next on the trajes within the zip object, which will update the atomic group coordinates.
