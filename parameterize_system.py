@@ -14,6 +14,7 @@ from openmm import XmlSerializer, CustomExternalForce
 from openmm import unit as u
 from pathlib import Path
 from math import sqrt
+from rdkit.Chem import AllChem as Chem
 
 
 def off_serialize(outdir: Path, name, openff_obj, sdf=False):
@@ -79,7 +80,11 @@ if not args.out_dir.is_dir():
     args.out_dir.mkdir(parents=True)
 
 if args.ligand_sdf:
-    ligand = Molecule.from_file(args.ligand, 'sdf')
+    suppl = Chem.SDMolSupplier(args.ligand, removeHs=False)
+    some_h_mol = next(suppl)  # just grabs the first conf off the supplier.
+    Chem.rdmolops.Kekulize(some_h_mol)
+    mol = Chem.rdmolops.AddHs(some_h_mol, addCoords=True)
+    ligand = Molecule.from_rdkit(mol)
 else:
     ligand = Molecule.from_smiles(args.ligand)
 ligand.generate_conformers(n_conformers=1)

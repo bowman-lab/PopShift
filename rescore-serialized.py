@@ -214,8 +214,8 @@ for i, state_pose_ps in enumerate(ligand_paths):
     # change the paths to get receptor dir paths, from ligand paths
     receptor_paths = list(args.receptor_dir.joinpath(
         *pose_p.parts[-2:]) for pose_p in state_pose_ps)
-    print('Loaded receptor paths for state', i, flush=True)
     receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
+    print('Loaded receptor paths for state', i, flush=True)
     traj_zip = zip(receptor_traj, ligand_traj, receptor_paths)
     # Next will call next on the trajes within the zip object, which will update the atomic group coordinates.
     for _, _, receptor_path in traj_zip:
