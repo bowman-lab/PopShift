@@ -34,6 +34,25 @@ def omm_serialize(outdir: Path, name, omm_obj):
     return outp
 
 
+# takes an SDF fn, returns an openFF molecule that has had hydrogens and stereo added
+# Adapted from openff.toolkit.utils.rdkit_wrapper._assign_aromaticity_and_stereo_from_3d
+def rdkit_sanitize_and_stereo(sdf_fn):
+    suppl = Chem.SDMolSupplier(args.ligand, removeHs=False)
+    pose_rdkmol = next(suppl)  # just grabs the first conf off the supplier.
+    pose_rdkmol = Chem.rdmolops.AddHs(pose_rdkmol, addCoords=True)
+    Chem.SanitizeMol(
+        pose_rdkmol,
+        Chem.SANITIZE_ALL ^ Chem.SANITIZE_ADJUSTHS
+    )
+    Chem.AssignStereochemistryFrom3D(pose_rdkmol)
+    Chem.rdmolops.Kekulize(pose_rdkmol, clearAromaticFlags=True)
+    Chem.SetAromaticity(pose_rdkmol, Chem.AromaticityModel.AROMATICITY_MDL)
+    offmol_w_stereo_and_aro = Molecule.from_rdkit(
+        pose_rdkmol, allow_undefined_stereo=True, hydrogens_are_explicit=True
+    )
+    return offmol_w_stereo_and_aro
+
+
 p = ap.ArgumentParser(formatter_class=ap.ArgumentDefaultsHelpFormatter)
 p.add_argument('receptor_pdb', type=Path, 
                help='Receptor PDB file to parameterize.')
@@ -80,11 +99,7 @@ if not args.out_dir.is_dir():
     args.out_dir.mkdir(parents=True)
 
 if args.ligand_sdf:
-    suppl = Chem.SDMolSupplier(args.ligand, removeHs=False)
-    some_h_mol = next(suppl)  # just grabs the first conf off the supplier.
-    Chem.rdmolops.Kekulize(some_h_mol)
-    mol = Chem.rdmolops.AddHs(some_h_mol, addCoords=True)
-    ligand = Molecule.from_rdkit(mol)
+    ligand = rdkit_sanitize_and_stereo(args.ligand_sdf)
 else:
     ligand = Molecule.from_smiles(args.ligand)
 ligand.generate_conformers(n_conformers=1)
