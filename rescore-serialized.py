@@ -11,7 +11,6 @@ import pickle
 from enspara import ra
 import argparse as ap
 from rdkit.Chem import AllChem as Chem
-import spyrmsd as sp
 
 
 # takes a hydrogenated and correct template and a target molecule, returns target's coords
@@ -27,23 +26,6 @@ def get_mol_sdf(sdf: Path):
 
 def get_multiposes_sdf(sdf: Path):
     return list(Chem.SDMolSupplier(str(sdf, removeHs=False)))
-
-
-def map_via_graph(ap: Path, bp: Path):
-    a_obmol = sp.io.load(str(ap))
-    a_spymol = sp.io.to_molecule(a_obmol, adjacency=True)
-    b_obmol = sp.io.load(str(bp))
-    b_spymol = sp.io.to_molecule(b_obmol, adjacency=True)
-    a_noh = a_spymol.strip()
-    b_noh = b_spymol.strip()
-
-    # Convert molecules to graphs
-    G1 = a_noh.to_graph()
-    G2 = b_noh.to_graph()
-
-    # Get all the possible graph isomorphisms
-    isomorphisms = sp.graph.match_graphs(G1, G2)
-    return isomorphisms
 
 
 def float_to_kcal_mol_angstrom(number):
@@ -282,6 +264,8 @@ else:
 ligand_sim, ligand_top, ligand_rdkit_mol = get_ligand_setup(
     param_dir, 'ligand')
 
+pose_reader = get_mol_sdf
+
 print('Loaded OpenMM systems. Getting ready to do energy evaluations', flush=True)
 # initialize empty lists to retain scores, and track lengths.
 scores = []
@@ -298,8 +282,8 @@ for i, state_pose_ps in enumerate(ligand_paths):
     traj_zip = zip(receptor_traj, state_pose_ps, receptor_paths)
     # for-loop will call next on the trajes within the zip object, which will update the atomic group coordinates.
     for _, state_pose, receptor_path in traj_zip:
+        pose_mol = pose_reader(state_pose)
         if args.add_hydrogen:
-            pose_mol = get_mol_sdf(str(state_pose))
             pose_coords = add_hs_get_coors(ligand_rdkit_mol, pose_mol)
         else:
             pose_coords = ligand_ag.getCoords()
