@@ -244,7 +244,7 @@ scores = []
 if args.add_hydrogen:
     for i, state_pose_ps in enumerate(ligand_paths):
         print('Loaded ligand paths for state', i, flush=True)
-        # change the paths to get receptor dir paths, from ligand paths
+        # change the paths to get receptor dir paths from ligand paths
         receptor_paths = list(args.receptor_dir.joinpath(
             *pose_p.parts[-2:]) for pose_p in state_pose_ps)
         receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
@@ -252,43 +252,41 @@ if args.add_hydrogen:
         traj_zip = zip(receptor_traj, state_pose_ps, receptor_paths)
         # for-loop will call next on the trajes within the zip object, which will update the atomic group coordinates.
         for _, state_pose, receptor_path in traj_zip:
-            
-            # always do this receptor first!
-            complex_ag = receptor_ag + ligand_ag
+            pose_mol = get_mol_sdf(str(state_pose))
+            pose_coords = add_hs_get_coors(ligand_rdkit_mol, pose_mol)
+            frame_coords = receptor_ag.getCoords()
+            posed_complex_coords = np.concatenate((frame_coords, pose_coords))           # always do this receptor first!
             if args.minimize:
                 if args.restrain:
-                    complex_e, complex_crds = get_restrained_energy_from_coords(
+                    complex_e, min_complex_coords = get_restrained_energy_from_coords(
                         complex_sim,
-                        complex_ag.getCoords(),
+                        posed_complex_coords,
                         rec_rest_inds,
                         cplx_res,
                         cplx_res_fg,
                         cplx_part_term_inds
                     )
-                    receptor_e, receptor_crds = get_restrained_energy_from_coords(
+                    receptor_e, min_receptor_coords = get_restrained_energy_from_coords(
                         receptor_sim,
-                        receptor_ag.getCoords(),
+                        frame_coords,
                         rec_rest_inds,
                         rec_res,
                         rec_res_fg,
                         rec_part_term_inds
                     )
-                    # get just the ligand coordinates out of the complex
-                    ligand_ag.setCoords(complex_crds[-len(ligand_ag):])
 
                 else:
-                    complex_e, complex_crds = get_minimized_energy(
-                        complex_sim, complex_ag)
-                    receptor_e, receptor_crds = get_minimized_energy(
-                        receptor_sim, receptor_ag)
-                    # get just the ligand coordinates out of the complex
-                    ligand_ag.setCoords(complex_crds[-len(ligand_ag):])
-                    # use the minimized coords to estimate the ligand alone energy
-                    ligand_e = get_minimized_energy(ligand_sim, ligand_ag)
+                    complex_e, min_complex_coords = get_minimized_energy(
+                        complex_sim, posed_complex_coords)
+                    receptor_e, min_receptor_coords = get_minimized_energy(
+                        receptor_sim, frame_coords)
+                # get just the ligand coordinates out of the complex
+                min_ligand_coords = min_complex_coords[-len(ligand_ag):]
+                ligand_e = get_energy_from_coords(ligand_sim, min_ligand_coords)
             else:
-                complex_e = get_energy_from_coords(complex_sim, complex_ag.getCoords())
-                receptor_e = get_energy_from_coords(receptor_sim, receptor_ag.getCoords())
-            ligand_e = get_energy_from_coords(ligand_sim, ligand_ag.getCoords())
+                complex_e = get_energy_from_coords(complex_sim, posed_complex_coords)
+                receptor_e = get_energy_from_coords(receptor_sim, frame_coords)
+                ligand_e = get_energy_from_coords(ligand_sim, pose_coords)
             interaction_e = complex_e - (receptor_e + ligand_e)
             # Save and report the scores.
             scores.append(interaction_e.value_in_unit(u.kilocalories_per_mole))
@@ -315,51 +313,51 @@ else:
         # Next will call next on the trajes within the zip object, which will update the atomic group coordinates.
         for _, _, receptor_path in traj_zip:
             # always do this receptor first!
-            # complex_ag = receptor_ag + ligand_ag
-            rec_coords = np.array(receptor_ag.getCoords())
-            ligand_coords = np.array(ligand_ag.getCoords())
-            complex_coords = np.concatenate((rec_coords, ligand_coords))
+            frame_coords = receptor_ag.getCoords()
+            pose_coords = ligand_ag.getCoords()
+            posed_complex_coords = np.concatenate((frame_coords, pose_coords))
             if args.minimize:
                 if args.restrain:
-                    complex_e, complex_crds = get_restrained_energy_from_coords(
+                    complex_e, min_complex_coords = get_restrained_energy_from_coords(
                         complex_sim,
-                        complex_coords,
+                        posed_complex_coords,
                         rec_rest_inds,
                         cplx_res,
                         cplx_res_fg,
                         cplx_part_term_inds
                     )
-                    receptor_e, receptor_crds = get_restrained_energy_from_coords(
+                    receptor_e, min_receptor_coords = get_restrained_energy_from_coords(
                         receptor_sim,
-                        rec_coords,
+                        frame_coords,
                         rec_rest_inds,
                         rec_res,
                         rec_res_fg,
                         rec_part_term_inds
                     )
                     # get just the ligand coordinates out of the complex
-                    ligand_ag.setCoords(complex_crds[-len(ligand_ag):])
+                    ligand_ag.setCoords(min_complex_coords[-len(ligand_ag):])
 
                 else:
-                    complex_e, complex_crds = get_minimized_energy(
-                        complex_sim, complex_ag)
-                    receptor_e, receptor_crds = get_minimized_energy(
-                        receptor_sim, receptor_ag)
+                    complex_e, min_complex_coords = get_minimized_energy(
+                        complex_sim, posed_complex_coords)
+                    receptor_e, min_receptor_coords = get_minimized_energy(
+                        receptor_sim, receptor_ag.getCoords())
                     # get just the ligand coordinates out of the complex
-                    ligand_ag.setCoords(complex_crds[-len(ligand_ag):])
+                    ligand_ag.setCoords(min_complex_coords[-len(ligand_ag):])
                     # use the minimized coords to estimate the ligand alone energy
-                    ligand_e = get_minimized_energy(ligand_sim, ligand_ag.getCoords())
+                    ligand_e = get_minimized_energy(ligand_sim, pose_coords)
             else:
-                complex_e = get_energy_from_coords(complex_sim, complex_ag)
-                receptor_e = get_energy_from_coords(receptor_sim, receptor_ag)
-            ligand_e = get_energy_from_coords(ligand_sim, ligand_ag)
+                complex_e = get_energy_from_coords(complex_sim, posed_complex_coords)
+                receptor_e = get_energy_from_coords(receptor_sim, receptor_ag.getCoords())
+                ligand_coords = pose_coords
+            ligand_e = get_energy_from_coords(ligand_sim, pose_coords)
             interaction_e = complex_e - (receptor_e + ligand_e)
             # Save and report the scores.
             scores.append(interaction_e.value_in_unit(u.kilocalories_per_mole))
             rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
             print(rec_rel_path, 'complex', complex_e, 'ligand', ligand_e,
                 'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
-
+            # write structures, if requested to do so.
             if args.outconf_prefix:
                 outdir = args.outconf_prefix/rec_rel_path.with_suffix('')
                 outdir.parent.mkdir(parents=True, exist_ok=True)
