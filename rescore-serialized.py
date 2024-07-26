@@ -14,7 +14,7 @@ from rdkit.Chem import AllChem as Chem
 
 
 # takes a hydrogenated and correct template and a target molecule, returns target's coords
-def add_hs_get_coors(template: Chem.Molecule, mol: Chem.Molecule):
+def add_hs_get_coords(template: Chem.Molecule, mol: Chem.Molecule):
     molh = mol.AddHs(mol, addCoords=True)
     matched = Chem.AssignBondOrdersFromTemplate(template, molh)
     return matched.GetConformer().GetPositions()
@@ -25,7 +25,7 @@ def get_mol_sdf(sdf: Path):
 
 
 def get_multiposes_sdf(sdf: Path):
-    return list(Chem.SDMolSupplier(str(sdf, removeHs=False)))
+    return Chem.SDMolSupplier(str(sdf), removeHs=False)
 
 
 def float_to_kcal_mol_angstrom(number):
@@ -199,6 +199,86 @@ def vtraj_by_filename(traj_path_iterator, atomic_group):
     )
 
 
+class InterEnergy:
+    def __init__(self, ligand_sim, receptor_sim, complex_sim):
+        self.ligand_sim = ligand_sim
+        self.receptor_sim = receptor_sim
+        self.complex_sim = complex_sim
+
+    def __call__(self, frame_coords, pose_coords):
+        # always do this receptor first!
+        posed_complex_coords = np.concatenate((frame_coords, pose_coords))
+        complex_e = get_energy_from_coords(
+            self.complex_sim, posed_complex_coords)
+        receptor_e = get_energy_from_coords(self.receptor_sim, frame_coords)
+        ligand_e = get_energy_from_coords(self.ligand_sim, pose_coords)
+        return complex_e, receptor_e, ligand_e
+
+
+class MinimizedInterEnergy(InterEnergy):
+    def __init__(self, ligand_sim, receptor_sim, complex_sim):
+        super().__init__(ligand_sim, receptor_sim, complex_sim)
+
+    def __call__(self, frame_coords, pose_coords):
+        # always do this receptor first!
+        posed_complex_coords = np.concatenate((frame_coords, pose_coords))
+        complex_e, min_complex_coords = get_min_energy_coords(
+            self.complex_sim, posed_complex_coords)
+        receptor_e = get_minimized_energy(self.receptor_sim, frame_coords)
+        min_lig_coords = min_complex_coords[-len(pose_coords):]
+        ligand_e = get_energy_from_coords(self.ligand_sim, min_lig_coords)
+        return complex_e, receptor_e, ligand_e
+
+
+class RestrainedInterEnergy(InterEnergy):
+    def __init__(self, ligand_sim, receptor_sim, complex_sim,
+                 rec_rest_inds, rec_res, rec_res_fg, rec_part_term_inds,
+                 cplx_res, cplx_res_fg, cplx_part_term_inds):
+        super().__init__(ligand_sim, receptor_sim, complex_sim)
+        self.rec_rest_inds = rec_rest_inds
+        self.rec_res = rec_res
+        self.rec_res_fg = rec_res_fg
+        self.rec_part_term_inds = rec_part_term_inds
+        self.cplx_res = cplx_res
+        self.cplx_res_fg = cplx_res_fg
+        self.cplx_part_term_inds = cplx_part_term_inds
+
+    def __call__(self, frame_coords, pose_coords):
+        # always do this receptor first!
+        posed_complex_coords = np.concatenate((frame_coords, pose_coords))
+        complex_e, min_complex_coords = get_restrain_min_energy_coords(
+            self.complex_sim,
+            posed_complex_coords,
+            self.rec_rest_inds,
+            self.cplx_res,
+            self.cplx_res_fg,
+            self.cplx_part_term_inds
+        )
+        receptor_e = get_restrain_min_energy(
+            self.receptor_sim,
+            frame_coords,
+            self.rec_rest_inds,
+            self.rec_res,
+            self.rec_res_fg,
+            self.rec_part_term_inds
+        )
+        min_lig_coords = min_complex_coords[-len(pose_coords):]
+        ligand_e = get_energy_from_coords(self.ligand_sim, min_lig_coords)
+        return complex_e, receptor_e, ligand_e
+
+
+def write_pdbs_from_calculator(calculator, out_prefix, receptor_relative_path,
+                               receptor_top, ligand_top, complex_top, pose_index):
+    outdir = out_prefix / receptor_relative_path
+    outdir.parent.mkdir(parents=True, exist_ok=True)
+    save_conf_pdb(receptor_top, calculator.receptor_sim,
+                  outdir / f'receptor-{pose_index:03}.pdb')
+    save_conf_pdb(ligand_top, calculator.ligand_sim,
+                  outdir / f'ligand-{pose_index:03}.pdb')
+    save_conf_pdb(complex_top, calculator.complex_sim,
+                  outdir / f'complex-{pose_index:03}.pdb')
+
+
 p = ap.ArgumentParser(formatter_class=ap.ArgumentDefaultsHelpFormatter)
 p.add_argument('param_dir', type=Path,
                help='Path to directory holding parameterized topology and systems. '
@@ -245,31 +325,45 @@ else:
     ligand_paths = [[top_dir / pose.with_suffix('.pdb') for pose in state_poses]
                     for state_poses in ligand_paths]
 # Set up simulations, potentially with restraints.
-if args.restrain:
-    # get restraind indices for ligand heavies.
-    ligand_heavies = loos.selectAtoms(ligand_ag, '!hydrogen')
-    lig_rest_inds = [at.index() for at in ligand_heavies]
+ligand_sim, ligand_top, ligand_rdkit_mol = get_ligand_setup(
+    param_dir, 'ligand')
+if args.minimize:
+    if args.restrain:
+        # get restraind indices for ligand heavies.
+        ligand_heavies = loos.selectAtoms(ligand_ag, '!hydrogen')
+        lig_rest_inds = [at.index() for at in ligand_heavies]
 
-    # generate restraint indices for receptor heavies.
-    receptor_heavies = loos.selectAtoms(receptor_ag, '!hydrogen')
-    rec_rest_inds = [at.index() for at in receptor_heavies]
+        # generate restraint indices for receptor heavies.
+        receptor_heavies = loos.selectAtoms(receptor_ag, '!hydrogen')
+        rec_rest_inds = [at.index() for at in receptor_heavies]
 
-    complex_sim, complex_top, cplx_res, cplx_part_term_inds, cplx_res_fg = get_setup_restraints(
-        param_dir, 'complex', restraint_inds=rec_rest_inds, restraint_constant=args.restraint_k)
-    receptor_sim, receptor_top, rec_res, rec_part_term_inds, rec_res_fg = get_setup_restraints(
-        param_dir, 'receptor', restraint_inds=rec_rest_inds, restraint_constant=args.restraint_k)
+        complex_sim, complex_top, cplx_res, cplx_part_term_inds, cplx_res_fg = get_setup_restraints(
+            param_dir, 'complex', restraint_inds=rec_rest_inds, restraint_constant=args.restraint_k)
+        receptor_sim, receptor_top, rec_res, rec_part_term_inds, rec_res_fg = get_setup_restraints(
+            param_dir, 'receptor', restraint_inds=rec_rest_inds, restraint_constant=args.restraint_k)
+
+        ie_calculator = RestrainedInterEnergy(ligand_sim, receptor_sim, complex_sim,
+                                              rec_rest_inds, rec_res, rec_res_fg, rec_part_term_inds,
+                                              cplx_res, cplx_res_fg, cplx_part_term_inds)
+    else:
+        complex_sim, complex_top = get_setup(param_dir, 'complex')
+        receptor_sim, receptor_top = get_setup(param_dir, 'receptor')
+        ie_calculator = MinimizedInterEnergy(
+            ligand_sim, receptor_sim, complex_sim)
 else:
     complex_sim, complex_top = get_setup(param_dir, 'complex')
     receptor_sim, receptor_top = get_setup(param_dir, 'receptor')
-ligand_sim, ligand_top, ligand_rdkit_mol = get_ligand_setup(
-    param_dir, 'ligand')
+    ie_calculator = InterEnergy(ligand_sim, receptor_sim, complex_sim)
 
-pose_reader = get_mol_sdf
+if args.ligand_paths[0][0].suffix == '.sdf':
+    do_ligand_updates_ag = False
+else:
+    do_ligand_updates_ag = True
 
 print('Loaded OpenMM systems. Getting ready to do energy evaluations', flush=True)
 # initialize empty lists to retain scores, and track lengths.
 scores = []
-lengths= []
+lengths = []
 # loop over ligand and receptor poses, get coords, do energy calx, optionally save poses.
 for i, state_pose_ps in enumerate(ligand_paths):
     print('Loaded ligand paths for state', i, flush=True)
@@ -279,65 +373,54 @@ for i, state_pose_ps in enumerate(ligand_paths):
         *pose_p.parts[-2:]) for pose_p in state_pose_ps)
     receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
     print('Loaded receptor paths for state', i, flush=True)
+    if do_ligand_updates_ag:
+        ligand_traj = vtraj_by_filename(state_pose_ps)
     traj_zip = zip(receptor_traj, state_pose_ps, receptor_paths)
-    # for-loop will call next on the trajes within the zip object, which will update the atomic group coordinates.
+    # for-loop will call next on the trajes within the zip object,
+    # which will update the atomic group coordinates.
     for _, state_pose, receptor_path in traj_zip:
-        pose_mol = pose_reader(state_pose)
-        if args.add_hydrogen:
-            pose_coords = add_hs_get_coors(ligand_rdkit_mol, pose_mol)
-        else:
-            pose_coords = ligand_ag.getCoords()
         frame_coords = receptor_ag.getCoords()
-        # always do this receptor first!
-        posed_complex_coords = np.concatenate((frame_coords, pose_coords))
-        if args.minimize:
-            if args.restrain:
-                complex_e, min_complex_coords = get_restrain_min_energy_coords(
-                    complex_sim,
-                    posed_complex_coords,
-                    rec_rest_inds,
-                    cplx_res,
-                    cplx_res_fg,
-                    cplx_part_term_inds
-                )
-                receptor_e = get_restrain_min_energy(
-                    receptor_sim,
-                    frame_coords,
-                    rec_rest_inds,
-                    rec_res,
-                    rec_res_fg,
-                    rec_part_term_inds
-                )
-
+        if args.multi_pose:
+            if args.add_hydrogen:
+                pose_iter = get_multiposes_sdf(state_pose)
+                def get_pose_coords(pose_mol): return add_hs_get_coords(
+                    ligand_rdkit_mol, pose_mol)
             else:
-                complex_e, min_complex_coords = get_min_energy_coords(
-                    complex_sim, posed_complex_coords)
-                receptor_e = get_minimized_energy(
-                    receptor_sim, frame_coords)
-            # get just the ligand coordinates out of the complex
-            min_lig_coords = min_complex_coords[-len(ligand_ag):]
-            # do not minimize the ligand independent of receptor.
-            ligand_e = get_energy_from_coords(
-                ligand_sim, min_lig_coords)
+                def get_pose_coords(ag): return ag.getCoords()
+            pose_scores = []
+            for pose_index, pose in enumerate(pose_iter):
+                pose_coords = get_pose_coords(pose)
+                complex_e, receptor_e, ligand_e = ie_calculator(
+                    frame_coords, pose_coords)
+                interaction_e = complex_e - (receptor_e + ligand_e)
+                # Save and report the scores.
+                pose_scores.append(
+                    interaction_e.value_in_unit(u.kilocalories_per_mole))
+                rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
+                print(rec_rel_path, 'pose-index', pose_index, 'complex', complex_e, 'ligand', ligand_e,
+                      'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
+                if args.outconf_prefix:
+                    write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path,
+                                               ligand_top, complex_top, pose_index)
+            scores.append(np.array(pose_scores))
         else:
-            complex_e = get_energy_from_coords(
-                complex_sim, posed_complex_coords)
-            receptor_e = get_energy_from_coords(receptor_sim, frame_coords)
-            ligand_e = get_energy_from_coords(ligand_sim, pose_coords)
-        interaction_e = complex_e - (receptor_e + ligand_e)
-        # Save and report the scores.
-        scores.append(interaction_e.value_in_unit(u.kilocalories_per_mole))
-        rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
-        print(rec_rel_path, 'complex', complex_e, 'ligand', ligand_e,
-                'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
+            if args.add_hydrogen:
+                pose_mol = get_mol_sdf(state_pose)
+                pose_coords = add_hs_get_coords(ligand_rdkit_mol, pose_mol)
+            else:
+                ligand_ag = next(ligand_traj)
+                pose_coords = ligand_ag.getCoords()
+            complex_e, receptor_e, ligand_e = ie_calculator(
+                frame_coords, pose_coords)
+            interaction_e = complex_e - (receptor_e + ligand_e)
+            scores.append(interaction_e.value_in_unit(u.kilocalories_per_mole))
+            rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
+            print(rec_rel_path, 'complex', complex_e, 'ligand', ligand_e,
+                  'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
+            if args.outconf_prefix:
+                write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path,
+                                           ligand_top, complex_top, pose_index)
 
-        if args.outconf_prefix:
-            outdir = args.outconf_prefix/rec_rel_path.with_suffix('')
-            outdir.parent.mkdir(parents=True, exist_ok=True)
-            save_conf_pdb(receptor_top, receptor_sim,
-                            outdir/'receptor.pdb')
-            save_conf_pdb(ligand_top, ligand_sim, outdir/'ligand.pdb')
-            save_conf_pdb(complex_top, complex_sim, outdir/'complex.pdb')
 
 score_array = ra.RaggedArray(scores, lengths=lengths)
 # save the results
