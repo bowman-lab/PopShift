@@ -199,6 +199,18 @@ def vtraj_by_filename(traj_path_iterator, atomic_group):
     )
 
 
+"""
+The following are functors that use the openMM simulation objects 
+this scrip preps to compute and report energies for complex, 
+receptor, and ligand components, for calculation of the 
+interaction energy.
+
+Because this can either be done with no minimization, minimization,
+or minimization with restraints on the receptor, InterEnergy is 
+subclassed to give a uniform interface for the other two modes of 
+calculation. If other approaches are desired, the hope is that they
+could also be implemented by subclassing InterEnergy.
+"""
 class InterEnergy:
     def __init__(self, ligand_sim, receptor_sim, complex_sim):
         self.ligand_sim = ligand_sim
@@ -267,8 +279,12 @@ class RestrainedInterEnergy(InterEnergy):
         return complex_e, receptor_e, ligand_e
 
 
+# Using the simulation objects contained in an interaction energy calculator, 
+# write structures for the three component systems. `pose_index` indicates 
+# which pose in a multi-pose file is being written, and defaults to zero if 
+# multi-pose analysis is not requested.
 def write_pdbs_from_calculator(calculator, out_prefix, receptor_relative_path,
-                               receptor_top, ligand_top, complex_top, pose_index):
+                               receptor_top, ligand_top, complex_top, pose_index=0):
     outdir = out_prefix / receptor_relative_path
     outdir.parent.mkdir(parents=True, exist_ok=True)
     save_conf_pdb(receptor_top, calculator.receptor_sim,
@@ -327,6 +343,7 @@ else:
 # Set up simulations, potentially with restraints.
 ligand_sim, ligand_top, ligand_rdkit_mol = get_ligand_setup(
     param_dir, 'ligand')
+
 if args.minimize:
     if args.restrain:
         # get restraind indices for ligand heavies.
@@ -360,6 +377,34 @@ if args.ligand_paths[0][0].suffix == '.sdf':
 else:
     do_ligand_updates_ag = True
 
+if args.add_hydrogens:
+    if do_ligand_updates_ag:
+        raise ValueError('This script can only add Hydrogens on the fly to ligand SDFs,'
+                         ' but you asked to add hydrogens and supplied files with '
+                         f'the extension: "{args.ligand_paths[0][0].suffix}"')
+    if args.multi_pose:
+        get_pose_iter = get_multiposes_sdf
+    else:
+        get_pose = get_mol_sdf
+
+    def get_pose_coords(pose_mol):
+        return add_hs_get_coords(ligand_rdkit_mol, pose_mol)
+else:
+    if do_ligand_updates_ag:
+        if args.multi_pose:
+            def get_pose_iter(pose_p): return pyloos.Trajectory(str(pose_p), ligand_ag)
+        else:
+            def get_pose(ligand_traj): return next(ligand_traj)
+        def get_pose_coords(ag): return ag.getCoords()
+    else:
+        if args.multi_pose:
+            get_pose_iter = get_multiposes_sdf
+        else:
+            get_pose = get_mol_sdf
+        def get_pose_coords(mol): return mol.GetConformer().GetPositions()
+
+
+
 print('Loaded OpenMM systems. Getting ready to do energy evaluations', flush=True)
 # initialize empty lists to retain scores, and track lengths.
 scores = []
@@ -373,7 +418,7 @@ for i, state_pose_ps in enumerate(ligand_paths):
         *pose_p.parts[-2:]) for pose_p in state_pose_ps)
     receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
     print('Loaded receptor paths for state', i, flush=True)
-    if do_ligand_updates_ag:
+    if do_ligand_updates_ag and not args.multi_pose:
         ligand_traj = vtraj_by_filename(state_pose_ps)
     traj_zip = zip(receptor_traj, state_pose_ps, receptor_paths)
     # for-loop will call next on the trajes within the zip object,
@@ -381,13 +426,9 @@ for i, state_pose_ps in enumerate(ligand_paths):
     for _, state_pose, receptor_path in traj_zip:
         frame_coords = receptor_ag.getCoords()
         if args.multi_pose:
-            if args.add_hydrogen:
-                pose_iter = get_multiposes_sdf(state_pose)
-                def get_pose_coords(pose_mol): return add_hs_get_coords(
-                    ligand_rdkit_mol, pose_mol)
-            else:
-                def get_pose_coords(ag): return ag.getCoords()
+            pose_iter = get_pose_iter(state_pose)
             pose_scores = []
+            rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
             for pose_index, pose in enumerate(pose_iter):
                 pose_coords = get_pose_coords(pose)
                 complex_e, receptor_e, ligand_e = ie_calculator(
@@ -396,20 +437,15 @@ for i, state_pose_ps in enumerate(ligand_paths):
                 # Save and report the scores.
                 pose_scores.append(
                     interaction_e.value_in_unit(u.kilocalories_per_mole))
-                rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
                 print(rec_rel_path, 'pose-index', pose_index, 'complex', complex_e, 'ligand', ligand_e,
                       'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
                 if args.outconf_prefix:
                     write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path,
-                                               ligand_top, complex_top, pose_index)
+                                               ligand_top, complex_top, pose_index=pose_index)
             scores.append(np.array(pose_scores))
         else:
-            if args.add_hydrogen:
-                pose_mol = get_mol_sdf(state_pose)
-                pose_coords = add_hs_get_coords(ligand_rdkit_mol, pose_mol)
-            else:
-                ligand_ag = next(ligand_traj)
-                pose_coords = ligand_ag.getCoords()
+            pose = get_pose(state_pose)
+            pose_coords = get_pose_coords(pose)
             complex_e, receptor_e, ligand_e = ie_calculator(
                 frame_coords, pose_coords)
             interaction_e = complex_e - (receptor_e + ligand_e)
@@ -419,7 +455,7 @@ for i, state_pose_ps in enumerate(ligand_paths):
                   'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
             if args.outconf_prefix:
                 write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path,
-                                           ligand_top, complex_top, pose_index)
+                                           ligand_top, complex_top)
 
 
 score_array = ra.RaggedArray(scores, lengths=lengths)
