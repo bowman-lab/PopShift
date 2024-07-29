@@ -14,8 +14,8 @@ from rdkit.Chem import AllChem as Chem
 
 
 # takes a hydrogenated and correct template and a target molecule, returns target's coords
-def add_hs_get_coords(template: Chem.Molecule, mol: Chem.Molecule):
-    molh = mol.AddHs(mol, addCoords=True)
+def add_hs_get_coords(template: Chem.Mol, mol: Chem.Mol):
+    molh = Chem.AddHs(mol, addCoords=True)
     matched = Chem.AssignBondOrdersFromTemplate(template, molh)
     return matched.GetConformer().GetPositions()
 
@@ -41,7 +41,7 @@ def get_ligand_setup(serialize_dir: Path, fn: str):
     top = Topology.from_json(top_json_p.read_text())
     ommtop = top.to_openmm()
     # generate an RDKit molecule, for reading conformations
-    mol = next(top.molecules[0]).to_rdkit()
+    mol = next(top.molecules).to_rdkit()
     integrator = mm.VerletIntegrator(0.001*mm.unit.picosecond)
     simulation = Simulation(top, system, integrator, platform=platform)
     return simulation, ommtop, mol
@@ -91,7 +91,7 @@ def get_setup_restraints(serialize_dir: Path, fn: str, restraint_inds: list[int]
 # Don't need to return coords here because they don't change.
 def get_energy_from_coords(simulation: Simulation,
                            coords):
-    simulation.context.setPositions(coords * u.angstroms)
+    simulation.context.setPositions(coords)
     state = simulation.context.getState(getEnergy=True)
     energy = state.getPotentialEnergy().value_in_unit(
         u.kilocalories_per_mole) * u.kilocalories_per_mole
@@ -161,6 +161,7 @@ def get_restrain_min_energy_coords(simulation: Simulation,
                                    restraint_group, particle_term_inds,
                                    tolerance=0.001 * u.kilocalorie/(u.mole * u.angstrom)):
     positions_angstroms = coords * u.angstroms
+    print(len(positions_angstroms))
     simulation.context.setPositions(positions_angstroms)
     for atom_ix, particle_term_ix in zip(restraint_range, particle_term_inds):
         restraint_obj.setParticleParameters(
@@ -180,11 +181,10 @@ def get_restrain_min_energy_coords(simulation: Simulation,
 
 # Openmm topology and simulation saved to PDB using openmm utilities.
 # Coordinates come from current context in simulation.
-def save_conf_pdb(omt: mm.app.Topology, simulation: Simulation, outpre: Path, suffix: str):
+def save_conf_pdb(omt: mm.app.Topology, simulation: Simulation, outpath: Path):
     # get positions out of postmin state, get convert from nanometers to angstroms.
     positions = simulation.context.getState(getPositions=True).getPositions()
-    outfile = outpre.parent / (outpre.stem + suffix)
-    with outfile.open('w') as f:
+    with outpath.open('w') as f:
         PDBFile.writeFile(omt, positions, f)
 
 
@@ -285,8 +285,8 @@ class RestrainedInterEnergy(InterEnergy):
 # multi-pose analysis is not requested.
 def write_pdbs_from_calculator(calculator, out_prefix, receptor_relative_path,
                                receptor_top, ligand_top, complex_top, pose_index=0):
-    outdir = out_prefix / receptor_relative_path
-    outdir.parent.mkdir(parents=True, exist_ok=True)
+    outdir = out_prefix / (receptor_relative_path.parent / receptor_relative_path.stem)
+    outdir.mkdir(parents=True, exist_ok=True)
     save_conf_pdb(receptor_top, calculator.receptor_sim,
                   outdir / f'receptor-{pose_index:03}.pdb')
     save_conf_pdb(ligand_top, calculator.ligand_sim,
@@ -333,7 +333,7 @@ if args.rel_to:
 else:
     top_dir = args.receptor_dir.parent
 if args.pose_paths.suffix == '.txt':
-    ligand_paths = [[(top_dir / line).with_suffix('.pdb')]
+    ligand_paths = [[top_dir / line]
                     for line in args.pose_paths.read_text().strip().split()]
 else:
     with args.pose_paths.open('rb') as f:
@@ -372,9 +372,13 @@ else:
     receptor_sim, receptor_top = get_setup(param_dir, 'receptor')
     ie_calculator = InterEnergy(ligand_sim, receptor_sim, complex_sim)
 
-if args.ligand_paths[0][0].suffix == '.sdf':
+print(ligand_paths[0][0])
+
+if ligand_paths[0][0].suffix == '.sdf':
+    print('Reading SDFs with the RDKit.')
     do_ligand_updates_ag = False
 else:
+    print('Reading ligand PDBs with LOOS.')
     do_ligand_updates_ag = True
 
 if args.add_hydrogens:
@@ -415,11 +419,12 @@ for i, state_pose_ps in enumerate(ligand_paths):
     lengths.append(len(state_pose_ps))
     # change the paths to get receptor dir paths from ligand paths
     receptor_paths = list(args.receptor_dir.joinpath(
-        *pose_p.parts[-2:]) for pose_p in state_pose_ps)
+        *pose_p.parts[-2:]).with_suffix('.pdb') 
+        for pose_p in state_pose_ps)
     receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
     print('Loaded receptor paths for state', i, flush=True)
     if do_ligand_updates_ag and not args.multi_pose:
-        ligand_traj = vtraj_by_filename(state_pose_ps)
+        ligand_traj = vtraj_by_filename(state_pose_ps, ligand_ag)
     traj_zip = zip(receptor_traj, state_pose_ps, receptor_paths)
     # for-loop will call next on the trajes within the zip object,
     # which will update the atomic group coordinates.
@@ -446,6 +451,7 @@ for i, state_pose_ps in enumerate(ligand_paths):
         else:
             pose = get_pose(state_pose)
             pose_coords = get_pose_coords(pose)
+            print(pose.GetNumAtoms(), len(ligand_ag), len(pose_coords), len(receptor_ag))
             complex_e, receptor_e, ligand_e = ie_calculator(
                 frame_coords, pose_coords)
             interaction_e = complex_e - (receptor_e + ligand_e)
@@ -454,7 +460,7 @@ for i, state_pose_ps in enumerate(ligand_paths):
             print(rec_rel_path, 'complex', complex_e, 'ligand', ligand_e,
                   'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
             if args.outconf_prefix:
-                write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path,
+                write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path, receptor_top,
                                            ligand_top, complex_top)
 
 

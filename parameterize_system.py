@@ -36,8 +36,8 @@ def omm_serialize(outdir: Path, name, omm_obj):
 
 # takes an SDF fn, returns an openFF molecule that has had hydrogens and stereo added
 # Adapted from openff.toolkit.utils.rdkit_wrapper._assign_aromaticity_and_stereo_from_3d
-def rdkit_sanitize_and_stereo(sdf_fn):
-    suppl = Chem.SDMolSupplier(args.ligand, removeHs=False)
+def rdkit_sanitize_and_stereo(coords_fp):
+    suppl = Chem.SDMolSupplier(str(coords_fp), removeHs=False)
     pose_rdkmol = next(suppl)  # just grabs the first conf off the supplier.
     pose_rdkmol = Chem.rdmolops.AddHs(pose_rdkmol, addCoords=True)
     Chem.SanitizeMol(
@@ -53,6 +53,108 @@ def rdkit_sanitize_and_stereo(sdf_fn):
     return offmol_w_stereo_and_aro
 
 
+# ADAPTED FROM OpenFF-Toolkit's Molecule.from_pdb_and_smiles
+def gen_offmol_conf_and_smiles(
+    file_path: Path,
+    smiles: str,
+    allow_undefined_stereo: bool = False,
+    name: str = "",
+    remove_h = False,
+    remove_h_smiles=False
+):
+    """
+    Create a Molecule from a pdb file and a SMILES string using RDKit.
+
+    Requires RDKit to be installed.
+
+    The molecule is created and sanitised based on the SMILES string, we then find a mapping
+    between this molecule and one from the PDB based only on atomic number and connections.
+    The SMILES molecule is then reindexed to match the PDB, the conformer is attached, and the
+    molecule returned.
+
+    Note that any stereochemistry in the molecule is set by the SMILES, and not the coordinates
+    of the PDB.
+
+    Parameters
+    ----------
+    file_path
+        PDB or SDF file path--should be a conformer with an atom order it is desired to match.
+    smiles
+        a valid smiles string for the pdb, used for stereochemistry, formal charges, and bond order
+    allow_undefined_stereo
+        If false, raises an exception if SMILES contains undefined stereochemistry.
+    name
+        An optional name for the output molecule.
+    remove_h
+        Remove hydrogens from the conformer.
+    remove_h_smiles
+        Remove hydrogens from the smiles used to assign bond orders to the conformer.
+
+    Returns
+    --------
+    molecule
+        An OFFMol instance with ordering the same as used in the PDB file.
+
+    Raises
+    ------
+    InvalidConformerError
+    """
+    # Make the molecule from smiles
+    offmol = Molecule.from_smiles(
+        smiles,
+        allow_undefined_stereo=allow_undefined_stereo,
+    )
+    smi_rdkmol = Chem.MolFromSmiles(smiles)
+    if remove_h_smiles:
+        smi_rdkmol = Chem.rdmolops.RemoveHs(smi_rdkmol)
+    if file_path.suffix == '.pdb':
+        conf_rdkmol = Chem.MolFromPDBFile(str(file_path), removeHs=remove_h)
+    elif file_path.suffix == '.sdf':
+        conf_rdkmol = next(Chem.SDMolSupplier(str(file_path), removeHs=remove_h))
+    assigned_rdk_conf = Chem.AssignBondOrdersFromTemplate(smi_rdkmol, conf_rdkmol)
+    hydro_rdk_conf = Chem.rdmolops.AddHs(assigned_rdk_conf, addCoords=True)
+    conf_mol = Molecule.from_rdkit(
+        hydro_rdk_conf,
+        allow_undefined_stereo=True,
+        hydrogens_are_explicit=True
+    )
+    # check isomorphic and get the mapping if true the mapping will be
+    # dict[offmol_index, pdbmol_index] sorted by offmol index
+    isomorphic, mapping = Molecule.are_isomorphic(
+        offmol,
+        conf_mol,
+        return_atom_map=True,
+        aromatic_matching=False,
+        formal_charge_matching=False,
+        bond_order_matching=False,
+        atom_stereochemistry_matching=False,
+        bond_stereochemistry_matching=False,
+    )
+    # return offmol, pdbmol, pdb_rdkmol, isomorphic, mapping
+    if mapping is None:
+        from openff.toolkit.topology.molecule import InvalidConformerError
+
+        raise InvalidConformerError(
+            "The PDB and SMILES structures do not match.")
+
+    new_mol = offmol.remap(mapping)
+
+    # the pdb conformer is in the correct order so just attach it here
+    new_mol._add_conformer(conf_mol.conformers[0])
+
+    # Take residue info from PDB
+    for confatom, newatom in zip(conf_mol.atoms, new_mol.atoms):
+        newatom.metadata.update(confatom.metadata)
+        newatom.name = confatom.name
+    new_mol.add_default_hierarchy_schemes()
+
+    if name:
+        new_mol.name = name
+    else:
+        new_mol.name = file_path.stem
+    return new_mol
+
+
 p = ap.ArgumentParser(formatter_class=ap.ArgumentDefaultsHelpFormatter)
 p.add_argument('receptor_pdb', type=Path, 
                help='Receptor PDB file to parameterize.')
@@ -62,6 +164,9 @@ p.add_argument('out_dir', type=Path,
                help='Name of directory to write parameterized jsons and systems to.')
 p.add_argument('--ligand-sdf', '-s', action=ap.BooleanOptionalAction, default=False,
                help='If thrown, interpret ligand as path to SDF file.')
+p.add_argument('--ligand-from-conf', '-L', type=Path, default=None,
+               help='If provided, use the smiles and the path to a pose to produce '
+               'parameters with atom order matching poses from docking.')
 p.add_argument('--ligand-ff', type=str, default='openff_unconstrained-2.2.0.offxml',
                help='Name of force field to use as an argument to SMIRNOFFTemplateGenerator.')
 p.add_argument('--receptor-ff', type=str, default='amber/protein.ff14SB.xml',
@@ -83,6 +188,9 @@ p.add_argument('--salt-conc', type=float, default=0.150,
 p.add_argument('--kappa', type=float, default=None,
                help='Add screening parameters in as kappa directly, '
                'as opposed to using solvent condition inputs to calculate it.')
+p.add_argument('--name', type=str, default=None,
+               help='If provided, will use to name the parameterized ligand' 
+               'as part of openff-toolkit.Molecule metadata.')
 
 args = p.parse_args()
 
@@ -100,12 +208,15 @@ if not args.out_dir.is_dir():
 
 if args.ligand_sdf:
     ligand = rdkit_sanitize_and_stereo(args.ligand_sdf)
+elif args.ligand_from_conf:
+    ligand = gen_offmol_conf_and_smiles(args.ligand_from_conf, args.ligand, name=args.name)
 else:
     ligand = Molecule.from_smiles(args.ligand)
-ligand.generate_conformers(n_conformers=1)
 if nagl_model_path:
     ligand.assign_partial_charges(nagl_model_path, toolkit_registry=NAGLToolkitWrapper())
+    print('Assigned Charges using NAGL.', flush=True)
 else:
+    ligand.generate_conformers(n_conformers=1)
     print('Generated ligand conformers from SMILES. Prepping charges.', flush=True)
     ligand.assign_partial_charges(partial_charge_method='am1bcc', 
                                 use_conformers=ligand.conformers)
