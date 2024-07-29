@@ -15,17 +15,17 @@ from rdkit.Chem import AllChem as Chem
 
 # takes a hydrogenated and correct template and a target molecule, returns target's coords
 def add_hs_get_coords(template: Chem.Mol, mol: Chem.Mol):
-    molh = Chem.AddHs(mol, addCoords=True)
-    matched = Chem.AssignBondOrdersFromTemplate(template, molh)
-    return matched.GetConformer().GetPositions()
+    matched = Chem.AssignBondOrdersFromTemplate(template, mol)
+    molh = Chem.AddHs(matched, addCoords=True)
+    return molh.GetConformer().GetPositions()
 
 
-def get_mol_sdf(sdf: Path):
-    return next(Chem.SDMolSupplier(str(sdf), removeHs=False))
+def get_mol_sdf(sdf: Path, remove_hs=False):
+    return next(Chem.SDMolSupplier(str(sdf), removeHs=remove_hs))
 
 
-def get_multiposes_sdf(sdf: Path):
-    return Chem.SDMolSupplier(str(sdf), removeHs=False)
+def get_multiposes_sdf(sdf: Path, remove_hs=False):
+    return Chem.SDMolSupplier(str(sdf), removeHs=remove_hs)
 
 
 def float_to_kcal_mol_angstrom(number):
@@ -120,7 +120,7 @@ def get_min_energy_coords(simulation: Simulation,
                           tolerance=0.001*u.kilocalories_per_mole):
     simulation.context.setPositions(coords * u.angstroms)
     simulation.minimizeEnergy(tolerance=tolerance)
-    state = simulation.context.getState(getEnergy=True, getPOsitions=True)
+    state = simulation.context.getState(getEnergy=True, getPositions=True)
     post_min_coords = state.getPositions(asNumpy=True)
     energy = state.getPotentialEnergy().value_in_unit(
         u.kilocalories_per_mole) * u.kilocalories_per_mole
@@ -161,7 +161,6 @@ def get_restrain_min_energy_coords(simulation: Simulation,
                                    restraint_group, particle_term_inds,
                                    tolerance=0.001 * u.kilocalorie/(u.mole * u.angstrom)):
     positions_angstroms = coords * u.angstroms
-    print(len(positions_angstroms))
     simulation.context.setPositions(positions_angstroms)
     for atom_ix, particle_term_ix in zip(restraint_range, particle_term_inds):
         restraint_obj.setParticleParameters(
@@ -372,8 +371,6 @@ else:
     receptor_sim, receptor_top = get_setup(param_dir, 'receptor')
     ie_calculator = InterEnergy(ligand_sim, receptor_sim, complex_sim)
 
-print(ligand_paths[0][0])
-
 if ligand_paths[0][0].suffix == '.sdf':
     print('Reading SDFs with the RDKit.')
     do_ligand_updates_ag = False
@@ -387,12 +384,12 @@ if args.add_hydrogens:
                          ' but you asked to add hydrogens and supplied files with '
                          f'the extension: "{args.ligand_paths[0][0].suffix}"')
     if args.multi_pose:
-        get_pose_iter = get_multiposes_sdf
+        get_pose_iter = lambda x: get_multiposes_sdf(x, remove_hs=True)
     else:
-        get_pose = get_mol_sdf
-
+        get_pose = lambda x: get_mol_sdf(x, remove_hs=True)
+    ligand_rdkit_mol_noh = Chem.rdmolops.RemoveHs(ligand_rdkit_mol)
     def get_pose_coords(pose_mol):
-        return add_hs_get_coords(ligand_rdkit_mol, pose_mol)
+        return add_hs_get_coords(ligand_rdkit_mol_noh, pose_mol)
 else:
     if do_ligand_updates_ag:
         if args.multi_pose:
