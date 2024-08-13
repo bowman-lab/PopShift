@@ -171,9 +171,9 @@ p.add_argument('--ligand-ff', type=str, default='openff_unconstrained-2.2.0.offx
                help='Name of force field to use as an argument to SMIRNOFFTemplateGenerator.')
 p.add_argument('--receptor-ff', type=str, default='amber/protein.ff14SB.xml',
                help='Name of force field xml to use as argument to openmm.ForceField.')
-p.add_argument('--implicit', type=str, default='gbn2.xml', 
+p.add_argument('--implicit', type=str, default='implicit/gbn2.xml', 
                help='Name of implicit solvent model to use as argument to openmm ForceField. '
-               'Will have "implicit/" prepended.')
+               'If a path is provided, will read that file instead.')
 p.add_argument('--restraint-k', type=float, default=None,
                help='Restrain receptor to the starting conformation with the provided force constant;'
                 ' for minimized energy evaluations. Assumes k is in  kcal/(mol * Angstrom).')
@@ -240,7 +240,7 @@ off_serialize(args.out_dir, 'complex-top', rl_complex)
 # Create the SMIRNOFF template generator with the default installed force field
 smirnoff = SMIRNOFFTemplateGenerator(molecules=ligand, forcefield=args.ligand_ff)
 # Create an OpenMM ForceField object with AMBER ff14SB and TIP3P with compatible ions
-forcefield = ForceField(args.receptor_ff, 'implicit/' + args.implicit)
+forcefield = ForceField(args.receptor_ff, args.implicit)
 # Register the SMIRNOFF template generator
 forcefield.registerTemplateGenerator(smirnoff.generator)
 print('Getting ready to make force fields.')
