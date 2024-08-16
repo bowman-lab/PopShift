@@ -370,19 +370,24 @@ else:
     complex_sim, complex_top = get_setup(param_dir, 'complex')
     receptor_sim, receptor_top = get_setup(param_dir, 'receptor')
     ie_calculator = InterEnergy(ligand_sim, receptor_sim, complex_sim)
-
-if ligand_paths[0][0].suffix == '.sdf':
+lig_file_suffix = ligand_paths[0][0].suffix
+if lig_file_suffix == '.sdf':
     print('Reading SDFs with the RDKit.')
     do_ligand_updates_ag = False
-else:
+elif lig_file_suffix == '.pdb':
     print('Reading ligand PDBs with LOOS.')
     do_ligand_updates_ag = True
+else:
+    raise ValueError(f'{lig_file_suffix} is a filetype that cannot '
+                     'currently be read by the rescorer. '
+                     'Convert to pdb, or if you want to '
+                     'add hydrogens on the fly, .sdf .') 
 
 if args.add_hydrogens:
     if do_ligand_updates_ag:
         raise ValueError('This script can only add Hydrogens on the fly to ligand SDFs,'
                          ' but you asked to add hydrogens and supplied files with '
-                         f'the extension: "{args.ligand_paths[0][0].suffix}"')
+                         f'the extension: "{lig_file_suffix}"')
     if args.multi_pose:
         get_pose_iter = lambda x: get_multiposes_sdf(x, remove_hs=True)
     else:
@@ -400,7 +405,7 @@ else:
     else:
         if args.multi_pose:
             get_pose_iter = get_multiposes_sdf
-        else:
+        elseGBSAOBC2Force:
             get_pose = get_mol_sdf
         def get_pose_coords(mol): return mol.GetConformer().GetPositions()
 
