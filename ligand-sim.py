@@ -37,7 +37,7 @@ p.add_argument('param_dir', type=Path,
 p.add_argument('length', type=float_to_int,
                help="Number of steps to include in the simulation. "
                "Can be any string recognized by python's 'int' builtin, including strings of the form YeX")
-p.add_argument('--outdir', type=Path, default=None,
+p.add_argument('--outdir', '-o', type=Path, default=None,
                help='If provided, write outfiles to this directory. '
                'If not provided, will write to "param_dir".')
 p.add_argument('-T', '--temperature', type=float, default=300,
