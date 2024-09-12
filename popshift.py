@@ -135,7 +135,21 @@ def kcal_mol_from_kd(kd, rt):
     return np.log(kd) * rt
 
 
+# some tools report a pKd, which is a negative log10 Kd (so 6.0 -> micromolar Kd)
+def kcal_mol_from_pKd(rt, pKd):
+    if isinstance(pKd, ra.RaggedArray):
+        flat = pKd.flatten()
+        fes = np.log(10 ** (-1 * flat)) * rt
+        return ra.RaggedArray(fes, lengths=pKd.lengths)
+    else:
+        return np.log(10 ** (-1*pKd)) * rt
+
+
+def ident(x): return x
+
 # reductions below here
+
+
 def one_site_popshift(frame_weights, trimmed_binding_fes, rt):
     rtn = -rt
     return rtn * np.log(np.sum(frame_weights * np.exp(trimmed_binding_fes.astype(np.float128) / rtn, dtype=np.float128), dtype=np.float128))
@@ -160,7 +174,8 @@ def calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, ou
     if reweighted_eq:
         # convert trimmed Free energies to association constants
         kas = kd_from_kcal_mol(trimmed_fes, rt)**(-1)
-        reweights = reweighted_frames(frame_weights, kas, conc_ligand=reweighted_eq)
+        reweights = reweighted_frames(
+            frame_weights, kas, conc_ligand=reweighted_eq)
         fe_per_state = free_energy_per_state(frame_weights, reweights, rt)
         ra.save(str(outpath/(tag+'-dg.h5')),
                 ra.RaggedArray(fe_per_state, lengths=lengths))
@@ -182,20 +197,25 @@ def repack_as_dict(tuple_packed_results):
     return {key: value for key, value in tuple_packed_results}
 
 
-def interp_trj_samples_worker_index_from_file(rt, assignments, active_states, eq_probs, mapping, stride, kd_scale,
-                                              reweighted_eq, outpath, binding_run):
+def interp_trj_samples_worker_index_from_file(rt, assignments, active_states, eq_probs, mapping, stride,
+                                              kd_scale, reweighted_eq, outpath, score_converter,
+                                              binding_run):
     # turn base filename no ext into tag for saving later.
     tag = Path(binding_run).stem
     frame_weights, trimmed_fes = process_indexed_fe_file(binding_run, assignments,
-                                                         active_states, eq_probs, mapping, stride=stride)
-    return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath)
+                                                         active_states, eq_probs, mapping,
+                                                         stride=stride)
+    return tag, calx_output(score_converter(trimmed_fes), frame_weights, rt, tag, kd_scale,
+                            reweighted_eq, outpath)
 
 
-def interp_trj_samples_worker_strided_inds(rt, active_states, stride, assignments, frame_weights, kd_scale,
-                                           reweighted_eq, outpath, binding_run):
+def interp_trj_samples_worker_strided_inds(rt, active_states, stride, assignments, frame_weights,
+                                           kd_scale, reweighted_eq, outpath, score_converter,
+                                           binding_run):
     # turn base filename no ext into tag for saving later.
     tag = Path(binding_run).stem
-    fes = ra.RaggedArray(np.load(binding_run, allow_pickle=True))
+    fes = ra.RaggedArray(score_converter(
+        np.load(binding_run, allow_pickle=True)))
     trimmed_fes = filter_trim_binding_fes(
         fes, active_states, stride, assignments)
     return tag, calx_output(trimmed_fes, frame_weights, rt, tag, kd_scale, reweighted_eq, outpath)
@@ -212,6 +232,11 @@ def interp_trj_samples(args, rt):
         assignments = ra.RaggedArray(assignments)
     else:
         assignments = ra.load(args.assignments)
+
+    if args.pKd:
+        score_converter = partial(kcal_mol_from_pKd, rt)
+    else:
+        score_converter = ident
 
     # this may need to be redone to be more compatible with PyEMMA or other builders.
     # in principle all that's needed is an eq-probs array and a mapping array that works like enspara's.
@@ -231,23 +256,26 @@ def interp_trj_samples(args, rt):
                 for k in msm_obj.mapping_.to_mapped.keys()],
             dtype=np.int32
         )[active_states]
-        br_op = partial(interp_trj_samples_worker_index_from_file, rt, assignments, active_states, msm_obj.eq_probs_,
-                        mapping, args.stride, args.K_D_scale, args.reweighted_eq_prefix)
+        br_op = partial(interp_trj_samples_worker_index_from_file, rt,
+                        assignments, active_states, msm_obj.eq_probs_, mapping,
+                        args.stride, args.K_D_scale, args.reweighted_eq_prefix,
+                        score_converter)
     else:
         state_counts = count_strided_states(
             assignments, args.stride, active_states)
         frame_weights = filter_frame_weights(
             msm_obj, args.stride, state_counts, assignments, active_states)
-        br_op = partial(interp_trj_samples_worker_strided_inds, rt, active_states, args.stride, assignments,
-                        frame_weights, args.K_D_scale, args.reweighted_eq, args.out)
+        br_op = partial(interp_trj_samples_worker_strided_inds, rt, active_states,
+                        args.stride, assignments, frame_weights, args.K_D_scale,
+                        args.reweighted_eq, args.out, score_converter)
 
     packed_results = pool.map(br_op, args.binding_fes)
     pool.close()
     return repack_as_dict(packed_results)
 
 
-def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq, outpath, binding_run):
-    fes = ra.load(binding_run)
+def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq, outpath, score_converter, binding_run):
+    fes = score_converter(ra.load(binding_run))
     lengths = fes.lengths
     br_path = Path(binding_run)
     tag = br_path.stem
@@ -258,8 +286,12 @@ def interp_bin_samples_worker(rt, eq_probs, kd_scale, reweighted_eq, outpath, bi
 
 def interp_bin_samples(args, rt):
     pool = mp.Pool(args.nprocs)
+    if args.pKd:
+        score_converter = partial(kcal_mol_from_pKd, rt)
+    else:
+        score_converter = ident
     br_op = partial(interp_bin_samples_worker, rt, args.eq_probs,
-                    args.K_D_scale, args.reweighted_eq, args.out)
+                    args.K_D_scale, args.reweighted_eq, args.out, score_converter)
     packed_results = pool.map(br_op, args.binding_fes_h5s)
     pool.close()
     return repack_as_dict(packed_results)
@@ -289,6 +321,8 @@ def run_cli(raw_args=None):
                         help='Write calculation results to json here. Overwrites file if exists.')
     parser.add_argument('--gas-constant', '-R', type=float, default=R,
                         help="The ideal gas constant. Choose to match units of T.")
+    parser.add_argument('--pKd', action=ap.BooleanOptionalAction, default=False,
+                        help='If thrown, assume extracted scores are "pK_D", rather than "free energies".')
     parser.add_argument('--temperature', '-T', type=float, default=T,
                         help='The temperature to estimate free energy at. Choose to match units of R.')
     parser.add_argument('--unit-scale', type=float, default=unit_scale,
