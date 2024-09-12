@@ -210,6 +210,8 @@ subclassed to give a uniform interface for the other two modes of
 calculation. If other approaches are desired, the hope is that they
 could also be implemented by subclassing InterEnergy.
 """
+
+
 class InterEnergy:
     def __init__(self, ligand_sim, receptor_sim, complex_sim):
         self.ligand_sim = ligand_sim
@@ -278,13 +280,14 @@ class RestrainedInterEnergy(InterEnergy):
         return complex_e, receptor_e, ligand_e
 
 
-# Using the simulation objects contained in an interaction energy calculator, 
-# write structures for the three component systems. `pose_index` indicates 
-# which pose in a multi-pose file is being written, and defaults to zero if 
+# Using the simulation objects contained in an interaction energy calculator,
+# write structures for the three component systems. `pose_index` indicates
+# which pose in a multi-pose file is being written, and defaults to zero if
 # multi-pose analysis is not requested.
 def write_pdbs_from_calculator(calculator, out_prefix, receptor_relative_path,
                                receptor_top, ligand_top, complex_top, pose_index=0):
-    outdir = out_prefix / (receptor_relative_path.parent / receptor_relative_path.stem)
+    outdir = out_prefix / (receptor_relative_path.parent /
+                           receptor_relative_path.stem)
     outdir.mkdir(parents=True, exist_ok=True)
     save_conf_pdb(receptor_top, calculator.receptor_sim,
                   outdir / f'receptor-{pose_index:03}.pdb')
@@ -332,13 +335,13 @@ if args.rel_to:
 else:
     top_dir = args.receptor_dir.parent
 if args.pose_paths.suffix == '.txt':
-    ligand_paths = [[top_dir / line]
-                    for line in args.pose_paths.read_text().strip().split()]
+    ligand_pl = args.pose_paths.read_text().strip().split()
+    ligand_paths = [[top_dir / ligand_path] for ligand_path in ligand_pl]
 else:
     with args.pose_paths.open('rb') as f:
-        ligand_paths = pickle.load(f)
-    ligand_paths = [[top_dir / pose.with_suffix('.pdb') for pose in state_poses]
-                    for state_poses in ligand_paths]
+        ligand_pll = pickle.load(f)
+    ligand_paths = [[top_dir / pose for pose in state_poses]
+                    for state_poses in ligand_pll]
 # Set up simulations, potentially with restraints.
 ligand_sim, ligand_top, ligand_rdkit_mol = get_ligand_setup(
     param_dir, 'ligand')
@@ -384,26 +387,29 @@ if args.add_hydrogens:
                          ' but you asked to add hydrogens and supplied files with '
                          f'the extension: "{args.ligand_paths[0][0].suffix}"')
     if args.multi_pose:
-        get_pose_iter = lambda x: get_multiposes_sdf(x, remove_hs=True)
+        def get_pose_iter(x): return get_multiposes_sdf(x, remove_hs=True)
     else:
-        get_pose = lambda x: get_mol_sdf(x, remove_hs=True)
+        def get_pose(x): return get_mol_sdf(x, remove_hs=True)
     ligand_rdkit_mol_noh = Chem.rdmolops.RemoveHs(ligand_rdkit_mol)
+
     def get_pose_coords(pose_mol):
         return add_hs_get_coords(ligand_rdkit_mol_noh, pose_mol)
 else:
     if do_ligand_updates_ag:
         if args.multi_pose:
-            def get_pose_iter(pose_p): return pyloos.Trajectory(str(pose_p), ligand_ag)
+            def get_pose_iter(pose_p): return pyloos.Trajectory(
+                str(pose_p), ligand_ag)
         else:
             def get_pose(ligand_traj): return next(ligand_traj)
+
         def get_pose_coords(ag): return ag.getCoords()
     else:
         if args.multi_pose:
             get_pose_iter = get_multiposes_sdf
         else:
             get_pose = get_mol_sdf
-        def get_pose_coords(mol): return mol.GetConformer().GetPositions()
 
+        def get_pose_coords(mol): return mol.GetConformer().GetPositions()
 
 
 print('Loaded OpenMM systems. Getting ready to do energy evaluations', flush=True)
@@ -416,7 +422,7 @@ for i, state_pose_ps in enumerate(ligand_paths):
     lengths.append(len(state_pose_ps))
     # change the paths to get receptor dir paths from ligand paths
     receptor_paths = list(args.receptor_dir.joinpath(
-        *pose_p.parts[-2:]).with_suffix('.pdb') 
+        *pose_p.parts[-2:]).with_suffix('.pdb')
         for pose_p in state_pose_ps)
     receptor_traj = vtraj_by_filename(receptor_paths, receptor_ag)
     print('Loaded receptor paths for state', i, flush=True)
@@ -448,7 +454,8 @@ for i, state_pose_ps in enumerate(ligand_paths):
         else:
             pose = get_pose(state_pose)
             pose_coords = get_pose_coords(pose)
-            print(pose.GetNumAtoms(), len(ligand_ag), len(pose_coords), len(receptor_ag))
+            print(pose.GetNumAtoms(), len(ligand_ag),
+                  len(pose_coords), len(receptor_ag))
             complex_e, receptor_e, ligand_e = ie_calculator(
                 frame_coords, pose_coords)
             interaction_e = complex_e - (receptor_e + ligand_e)
