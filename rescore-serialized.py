@@ -432,40 +432,50 @@ for i, state_pose_ps in enumerate(ligand_paths):
     # for-loop will call next on the trajes within the zip object,
     # which will update the atomic group coordinates.
     for _, state_pose, receptor_path in traj_zip:
-        frame_coords = receptor_ag.getCoords()
-        if args.multi_pose:
-            pose_iter = get_pose_iter(state_pose)
-            pose_scores = []
-            rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
-            for pose_index, pose in enumerate(pose_iter):
+        # If docking failed, there will be an empty file. 
+        # Check for this, and proceed by recording zero.
+        if state_pose.stat().st_size == 0:
+            print(state_pose, 'is empty; recording 0.0.')
+            if args.multi_pose:
+                scores.append(np.array([0]))
+            else:
+                scores.append(0)
+        # proceed with getting the coordinates and doing the calculation
+        else:
+            frame_coords = receptor_ag.getCoords()
+            if args.multi_pose:
+                pose_iter = get_pose_iter(state_pose)
+                pose_scores = []
+                rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
+                for pose_index, pose in enumerate(pose_iter):
+                    pose_coords = get_pose_coords(pose)
+                    complex_e, receptor_e, ligand_e = ie_calculator(
+                        frame_coords, pose_coords)
+                    interaction_e = complex_e - (receptor_e + ligand_e)
+                    # Save and report the scores.
+                    pose_scores.append(
+                        interaction_e.value_in_unit(u.kilocalories_per_mole))
+                    print(rec_rel_path, 'pose-index', pose_index, 'complex', complex_e, 'ligand', ligand_e,
+                        'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
+                    if args.outconf_prefix:
+                        write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path,
+                                                ligand_top, complex_top, pose_index=pose_index)
+                scores.append(np.array(pose_scores))
+            else:
+                pose = get_pose(state_pose)
                 pose_coords = get_pose_coords(pose)
+                print(pose.GetNumAtoms(), len(ligand_ag),
+                    len(pose_coords), len(receptor_ag))
                 complex_e, receptor_e, ligand_e = ie_calculator(
                     frame_coords, pose_coords)
                 interaction_e = complex_e - (receptor_e + ligand_e)
-                # Save and report the scores.
-                pose_scores.append(
-                    interaction_e.value_in_unit(u.kilocalories_per_mole))
-                print(rec_rel_path, 'pose-index', pose_index, 'complex', complex_e, 'ligand', ligand_e,
-                      'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
+                scores.append(interaction_e.value_in_unit(u.kilocalories_per_mole))
+                rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
+                print(rec_rel_path, 'complex', complex_e, 'ligand', ligand_e,
+                    'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
                 if args.outconf_prefix:
-                    write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path,
-                                               ligand_top, complex_top, pose_index=pose_index)
-            scores.append(np.array(pose_scores))
-        else:
-            pose = get_pose(state_pose)
-            pose_coords = get_pose_coords(pose)
-            print(pose.GetNumAtoms(), len(ligand_ag),
-                  len(pose_coords), len(receptor_ag))
-            complex_e, receptor_e, ligand_e = ie_calculator(
-                frame_coords, pose_coords)
-            interaction_e = complex_e - (receptor_e + ligand_e)
-            scores.append(interaction_e.value_in_unit(u.kilocalories_per_mole))
-            rec_rel_path = Path().joinpath(*receptor_path.parts[-2:])
-            print(rec_rel_path, 'complex', complex_e, 'ligand', ligand_e,
-                  'receptor', receptor_e, 'Interaction Energy:', interaction_e, flush=True)
-            if args.outconf_prefix:
-                write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path, receptor_top,
-                                           ligand_top, complex_top)
+                    write_pdbs_from_calculator(ie_calculator, args.outconf_prefix, rec_rel_path, receptor_top,
+                                            ligand_top, complex_top)
 
 
 score_array = ra.RaggedArray(scores, lengths=lengths)
