@@ -194,7 +194,7 @@ if __name__ == '__main__' or jug.is_jug_running():
                         help='Path to the output. By convention, the name of the docking run including info like box size '
                         'if multiple are being tested.')
     parser.add_argument('box_center', type=coordreader,
-                        help='Comma delimited string listing x,y,z of box center. If x is negative start with backslash ("\-5,5,3")')
+                        help=r'Comma delimited string listing x,y,z of box center. If x is negative start with backslash ("\-5,5,3")')
     parser.add_argument('box_size', type=coordreader,
                         help='Comma delimited string listing lx,ly,lz as the lengths of the x, y and z box-sides.')
     parser.add_argument('ligand_list', nargs="+",
