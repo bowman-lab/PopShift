@@ -9,7 +9,7 @@ except ModuleNotFoundError:
     print('Could not find NAGLToolkitWrapper; is openff-nagl installed?',
           'Falling back to single point AM1BCC for charges.')
 from openmmforcefields.generators import SMIRNOFFTemplateGenerator
-from openmm.app import ForceField
+from openmm.app import ForceField, HBonds
 from openmm import XmlSerializer, CustomExternalForce
 from openmm import unit as u
 from pathlib import Path
@@ -191,6 +191,9 @@ p.add_argument('--kappa', type=float, default=None,
 p.add_argument('--name', type=str, default=None,
                help='If provided, will use to name the parameterized ligand' 
                'as part of openff-toolkit.Molecule metadata.')
+p.add_argument('--ligand-sim', action=ap.BooleanOptionalAction, default=False,
+               help='If thrown, write an extra ligand system that will contain constraints on '
+               'hydrogen bond lengths, so that the ligand can be simulated.')
 
 args = p.parse_args()
 
@@ -245,10 +248,10 @@ forcefield = ForceField(args.receptor_ff, args.implicit)
 forcefield.registerTemplateGenerator(smirnoff.generator)
 print('Getting ready to make force fields.')
 # make systems from each of the topologies above
-receptor_sys = forcefield.createSystem(receptor.to_openmm(), implicitSolventKappa=kappa)
-ligand_sys = forcefield.createSystem(lig_top.to_openmm(), implicitSolventKappa=kappa)
+receptor_sys = forcefield.createSystem(receptor.to_openmm(), implicitSolventKappa=kappa, removeCMMotion=False)
+ligand_sys = forcefield.createSystem(lig_top.to_openmm(), implicitSolventKappa=kappa, removeCMMotion=False)
 rl_complex_ommt = rl_complex.to_openmm()
-complex_sys = forcefield.createSystem(rl_complex_ommt, implicitSolventKappa=kappa)
+complex_sys = forcefield.createSystem(rl_complex_ommt, implicitSolventKappa=kappa, removeCMMotion=False)
 # optionally ad receptor restraints
 if args.restraint_k:
     restraint = CustomExternalForce('k*((x-x0)^2 + (y-y0)^2 + (z-z0)^2)')
@@ -267,5 +270,10 @@ omm_serialize(args.out_dir, 'complex-sys', complex_sys)
 omm_serialize(args.out_dir, 'receptor-sys', receptor_sys)
 omm_serialize(args.out_dir, 'ligand-sys', ligand_sys)
 
-
+if args.ligand_sim:
+    ligand_sys = forcefield.createSystem(lig_top.to_openmm(), 
+                                         implicitSolventKappa=kappa, 
+                                         removeCMMotion=False,
+                                         constraints=HBonds)
+    omm_serialize(args.out_dir, 'ligand-hconstrained-sys', ligand_sys)
 
