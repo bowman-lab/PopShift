@@ -209,6 +209,7 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, tra
 
     # set up the atomic groups that readFrame will update (they'll be references)
     subset = loos.selectAtoms(model, subset_selection)
+    subset.prune_bonds()
     align_subset = loos.selectAtoms(model, align_selection)
     # track previously read-from traj to see if we need to change which one is open.
     prev_trj = None
@@ -241,11 +242,14 @@ def align_samples(subset_vec, align_vec):
           alignment_result.iterations, 'iterations')
 
 
-def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs: bool):
+def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs: bool, write_pdbs: bool):
     # If out_path is already a path, then this returns it.
     # If out_path is a string, turn it into a pathlib Path object here
     op = Path(out_path)
     prev_ix = -1
+    if not write_pdbs:
+        write_bin_trajs = True
+    
     for (bin_ix, trj_ix, fra_ix), frame in zip(full_inds, subset_list):
         bp = op / str(bin_ix)
         # This will operate like mkdir -pf; it will overwrite.
@@ -255,9 +259,10 @@ def write_sampled_frames(subset_list, full_inds, out_path, write_bin_trajs: bool
                 outtraj = loos.DCDWriter(str(bp / 'samples.dcd'))
             outtraj.writeFrame(frame)
             prev_ix = bin_ix
-        pdb = loos.PDB.fromAtomicGroup(frame)
-        pdb_path = bp / '{}-{}.pdb'.format(trj_ix, fra_ix)
-        pdb_path.write_text(str(pdb))  # will close file handle after writing
+        if write_pdbs:
+            pdb = loos.PDB.fromAtomicGroup(frame)
+            pdb_path = bp / '{}-{}.pdb'.format(trj_ix, fra_ix)
+            pdb_path.write_text(str(pdb))  # will close file handle after writing
 
 
 def add_bonds_two_cuts(model: loos.AtomicGroup, heavy_cutoff: float, hydrogen_cutoff: float):
@@ -341,6 +346,8 @@ if __name__ == '__main__':
                         help='Write an enspara RaggedArray with each frame index selected to provided path.')
     parser.add_argument('--features', type=Path, default=None,
                         help='Supply a path to features that were used for clustering. This will then be used to pick sufficiently different frames from the bin by using kmeans clustering within a bin')
+    parser.add_argument('--write-pdbs', type=bool, default=False, action=ap.BooleanOptionalAction,
+                        help='Switch writing of pdbs off. If switched off, implies "--write-bin-trajs"')
 
     if __name__ == '__main__':
         for i, arg in enumerate(argv):
@@ -467,6 +474,6 @@ if __name__ == '__main__':
             chosen_frames, model, args.subset_selection, align_sel, traj_paths
         )
         align_samples(subset_vec, align_vec)
-        write_sampled_frames(subset_vec, full_inds, out_path, args.write_bin_trajs)
+        write_sampled_frames(subset_vec, full_inds, out_path, args.write_bin_trajs, args.write_pdbs)
         if args.write_bin_dtraj:
             ra.save(args.write_bin_dtraj, chosen_frames)
