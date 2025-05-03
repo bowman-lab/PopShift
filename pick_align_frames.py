@@ -296,7 +296,7 @@ if __name__ == '__main__':
         'kmeans': get_frames_using_kmeans
     }
 
-    parser = ap.ArgumentParser()
+    parser = ap.ArgumentParser(formatter_class=ap.ArgumentDefaultsHelpFormatter)
     parser.add_argument('receptor_name', type=str,
                         help="Name to use to use as top-level directory for the docking run tree.")
     parser.add_argument('model', type=str,
