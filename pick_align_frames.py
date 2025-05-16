@@ -208,8 +208,11 @@ def rip_conformations(chosen_inds, model, subset_selection, align_selection, tra
     align_vec = loos.AtomicGroupVector(len(full_inds))
 
     # set up the atomic groups that readFrame will update (they'll be references)
-    subset = loos.selectAtoms(model, subset_selection)
-    subset.prune_bonds()
+    if subset_selection == 'all':
+        subset = model
+    else:
+        subset = loos.selectAtoms(model, subset_selection)
+        subset.pruneBonds()
     align_subset = loos.selectAtoms(model, align_selection)
     # track previously read-from traj to see if we need to change which one is open.
     prev_trj = None
