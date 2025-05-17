@@ -278,7 +278,7 @@ if __name__ == '__main__' or jug.is_jug_running():
                                 cnn_freeze_receptor='--cnn_freeze_receptor', cpu=args.cpu, exhaustiveness=args.exhaustiveness)
         else:
             dock_algo = partial(dock_algo, num_modes=args.num_modes, cnn_scoring=args.cnn_scoring, 
-                                cpu=args.cpu, exhaustiveness=args.exhaustiveness)
+                                cpu=args.cpu, exhaustiveness=args.exhaustiveness, cnn_freeze_receptor='')
     else: 
         frame_paths = sorted(path_receptor.rglob('*.pdbqt'))
     # if docking to centers, or files without directory structure, 
