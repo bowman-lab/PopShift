@@ -101,8 +101,7 @@ def dock_gnina(box_center, box_size, receptor_path, ligand_path, output_path,
                num_modes=1, cnn_scoring='rescore', addH=0, exhaustiveness=32,
                cnn_freeze_receptor='--cnn_freeze_receptor', 
                pose_sort_order='CNNaffinity', cnn=None, cpu=1):
-    if cnn:
-        return sp.run(['gnina', '--receptor', str(receptor_path), '--ligand', str(ligand_path),
+    cmd_line = ['gnina', '--receptor', str(receptor_path), '--ligand', str(ligand_path),
                         '--center_x', f'{box_center[0]}',
                         '--center_y', f'{box_center[1]}',
                         '--center_z', f'{box_center[2]}',
@@ -116,25 +115,14 @@ def dock_gnina(box_center, box_size, receptor_path, ligand_path, output_path,
                         '--cnn', cnn,
                         '--addH', f'{addH}',
                         '--cpu', f'{cpu}',
-                        f'{cnn_freeze_receptor}',
-                        '--out', str(output_path)])
-    else:
-        return sp.run(['gnina', '--receptor', str(receptor_path), '--ligand', str(ligand_path),
-                   '--center_x', f'{box_center[0]}',
-                   '--center_y', f'{box_center[1]}',
-                   '--center_z', f'{box_center[2]}',
-                   '--size_x', f'{box_size[0]}',
-                   '--size_y', f'{box_size[1]}',
-                   '--size_z', f'{box_size[2]}',
-                   '--cnn_scoring', f'{cnn_scoring}',
-                   '--exhaustiveness', f'{exhaustiveness}',
-                   '--num_modes', f'{num_modes}',
-                   '--pose_sort_order', pose_sort_order,
-                   '--addH', f'{addH}',
-                   '--cpu', f'{cpu}',
-                   f'{cnn_freeze_receptor}',
-                   '--out', str(output_path)])
+                        '--out', str(output_path)]
 
+    if cnn:
+        cmd_line.append('--cnn')
+        cmd_line.append(cnn)
+    if cnn_freeze_receptor:
+        cmd_line.append(cnn_freeze_receptor)
+    return sp.run(cmd_line)
 
 # make a functor to hold plants exe and plants template.
 class plants_docker:
